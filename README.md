@@ -11,9 +11,14 @@ Double-cliquez sur `index.html` : il s'ouvre directement dans le navigateur en
 au chargement pour récupérer three.js (CDN cdnjs) et les polices Google Fonts ; la
 carte du monde, elle, est générée dans la page et ne déclenche aucune requête.
 
-Navigation : molette pour entrer dans le globe puis le faire tourner, glisser pour
-l'orienter librement, clic sur un nœud pour ouvrir une rubrique. `Tab` parcourt les
-cinq rubriques au clavier, `Entrée` ouvre, `Échap` ferme.
+Navigation : la barre de nœuds en bas d'écran liste les cinq rubriques et est
+visible dès le premier écran — un clic ouvre la rubrique et amène le globe
+dessus, sans rien avoir à faire défiler ni faire tourner. `Tab` parcourt ces
+cinq entrées, `Entrée` ouvre, `Échap` ferme.
+
+Pour ceux qui préfèrent explorer : le bouton « Explorer le globe » (ou la
+molette, ou un balayage vertical) bascule en vue globe, le glisser l'oriente
+librement et un clic direct sur un nœud ouvre sa rubrique.
 
 ## Modifier le contenu
 
@@ -58,5 +63,7 @@ script — modifiez les deux ensemble pour rester cohérent.
 - Les nœuds décoratifs secondaires se règlent dans `var SECONDAIRES` (nom, lat, lon).
 - La densité du globe se règle avec `var STEP = 1.0;` dans `buildDots()` : augmenter
   la valeur réduit le nombre de points (donc la charge GPU), la diminuer l'augmente.
-- Si three.js ne se charge pas ou si WebGL est indisponible, la page affiche un
-  message explicite au lieu d'un écran vide.
+- Si three.js ne se charge pas ou si WebGL est indisponible, la page bascule sur
+  une version texte complète des cinq rubriques au lieu d'un écran vide.
+- Le libellé des entrées de la barre de nœuds vient de `RUBRIQUES` : changer un
+  `nom` ou une `ville` met la barre à jour automatiquement.
