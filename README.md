@@ -1,6 +1,6 @@
 # Portfolio « globe réseau »
 
-Portfolio one-page interactif : le globe terrestre sert de menu. Cinq nœuds posés
+Portfolio one-page interactif : le globe terrestre sert de menu. Sept nœuds posés
 sur des capitales ouvrent chacun une rubrique dont le contenu se déploie en orbite
 autour du point.
 
@@ -11,10 +11,12 @@ Double-cliquez sur `index.html` : il s'ouvre directement dans le navigateur en
 au chargement pour récupérer three.js (CDN cdnjs) et les polices Google Fonts ; la
 carte du monde, elle, est générée dans la page et ne déclenche aucune requête.
 
-Navigation : la barre de nœuds en bas d'écran liste les cinq rubriques et est
+Navigation : la barre de nœuds en bas d'écran liste les sept rubriques et est
 visible dès le premier écran — un clic ouvre la rubrique et amène le globe
 dessus, sans rien avoir à faire défiler ni faire tourner. `Tab` parcourt ces
-cinq entrées, `Entrée` ouvre, `Échap` ferme.
+sept entrées, `Entrée` ouvre, `Échap` ferme. Chaque entrée porte le nom de la
+rubrique et son rang (`03 / 07`) ; la capitale, elle, n'apparaît que sur le
+globe et sous le titre ancré.
 
 Pour ceux qui préfèrent explorer : le bouton « Explorer le globe » (ou la
 molette, ou un balayage vertical) bascule en vue globe, le glisser l'oriente
@@ -64,6 +66,10 @@ script — modifiez les deux ensemble pour rester cohérent.
 - La densité du globe se règle avec `var STEP = 1.0;` dans `buildDots()` : augmenter
   la valeur réduit le nombre de points (donc la charge GPU), la diminuer l'augmente.
 - Si three.js ne se charge pas ou si WebGL est indisponible, la page bascule sur
-  une version texte complète des cinq rubriques au lieu d'un écran vide.
+  une version texte complète de toutes les rubriques au lieu d'un écran vide.
 - Le libellé des entrées de la barre de nœuds vient de `RUBRIQUES` : changer un
-  `nom` ou une `ville` met la barre à jour automatiquement.
+  `nom` met la barre à jour automatiquement, et le rang (`03 / 07`) se recalcule
+  tout seul si vous ajoutez ou retirez une rubrique.
+- Une rubrique ajoutée est câblée partout automatiquement (barre, clavier, arcs,
+  repli texte). Au-delà de sept, surveillez seulement la largeur de la barre :
+  elle passe sur deux rangées centrées plutôt que de sortir de l'écran.

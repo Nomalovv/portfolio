@@ -187,6 +187,14 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
   position:fixed; z-index:9; left:50%; bottom:22px;
   transform:translateX(-50%);
   display:flex; flex-direction:column; align-items:center; gap:10px;
+  /* width:max-content est indispensable. Un élément fixé en left:50% sans
+     `right` se dimensionne au « shrink-to-fit » : sa largeur disponible n'est
+     que la MOITIÉ de l'écran (de 50 % au bord droit), avant la translation qui
+     le recentre. À cinq entrées la barre tenait tout juste dans cette moitié ;
+     à sept elle la dépassait et repliait sur deux rangées dès 1600 px, ce qui
+     mangeait 52 px de hauteur utile et faisait alors chevaucher les cartes.
+     max-content lui rend sa largeur naturelle, bornée par l'écran réel. */
+  width:max-content;
   max-width:calc(100vw - 24px);
   opacity:0; pointer-events:none;
   transition:opacity .6s var(--ease);
@@ -202,6 +210,12 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 #dockhint b{color:rgba(228,240,249,.9); font-weight:500}
 #dock .rail{
   display:flex; align-items:stretch; gap:4px;
+  /* flex-wrap : filet de sécurité depuis le passage à sept rubriques. Les
+     entrées gardent leur largeur naturelle (voir .navnode) ; si la somme
+     dépasse quand même la largeur disponible, la barre passe sur deux lignes
+     centrées au lieu de sortir de l'écran. `dockReserve()` mesure la hauteur
+     réelle de la barre, donc les cartes de contenu suivent automatiquement. */
+  flex-wrap:wrap; justify-content:center;
   max-width:100%;
   padding:5px; border-radius:14px;
   background:var(--shell);
@@ -215,9 +229,9 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
   display:flex; flex-direction:column; align-items:flex-start; justify-content:center;
   gap:3px;
   /* flex:none : sans ça les entrées se compriment jusqu'à leur min-width et
-     « 04 · NEW YORK » passait sur deux lignes dès 1280 px, en désalignant la
-     barre. Elles gardent leur largeur naturelle ; la barre reste bien plus
-     étroite que l'écran de toute façon. */
+     un libellé long passait sur deux lignes dès 1280 px, en désalignant la
+     barre. Elles gardent leur largeur naturelle ; la barre reste plus
+     étroite que l'écran (voir le palier compact ci-dessous pour sept entrées). */
   flex:0 0 auto; white-space:nowrap;
   min-width:112px; min-height:48px;
   margin:0; padding:7px 14px 8px;
@@ -263,6 +277,18 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .navnode[aria-current="true"] .loc{color:rgba(255,199,154,.8)}
 .navnode[aria-current="true"] .pip{
   background:var(--warm); box-shadow:0 0 11px rgba(255,157,77,.9);
+}
+
+/* Palier compact — sept entrées sur un écran de portable.
+   À cinq rubriques la barre mesurait ~700 px et tenait partout. À sept elle
+   dépasse 960 px en taille pleine, donc elle touchait le bord de l'écran (et
+   basculait sur deux lignes) entre 840 et 1240 px. On resserre plutôt les
+   entrées : le libellé et le rang restent lisibles, la cible tactile garde ses
+   48 px de haut, et la barre repasse sous 720 px de large. */
+@media (min-width:821px) and (max-width:1279px){
+  .navnode{min-width:0; padding:7px 10px 8px}
+  .navnode .lbl{font-size:12.5px; gap:7px}
+  .navnode .loc{padding-left:13px; letter-spacing:.05em}
 }
 
 /* ============================================================
@@ -355,6 +381,20 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .block .more:active{transform:scale(.97)}
 .block a{color:var(--accent-soft); text-decoration:none; border-bottom:1px solid rgba(0,212,255,.38)}
 .block a:hover{border-bottom-color:rgba(0,212,255,.9); color:#d5faff}
+
+/* Écran bas (portable 1366×768, 1024×640…). Deux cartes empilées de 250 px
+   plus la barre de nœuds ne tiennent plus dans la hauteur utile : le placement
+   resserrait alors la gouttière jusqu'à 4 px, puis la boucle de rendu ramenait
+   la dernière carte de force dans l'écran, ce qui la faisait chevaucher la
+   précédente. On rend plutôt les cartes plus compactes : ~40 px gagnés par
+   carte, ce qui remet la pile dans le budget sans rien tronquer. */
+@media (min-width:821px) and (max-height:780px){
+  .block{width:302px; padding:14px 16px 14px}
+  .block h3{margin-bottom:7px; font-size:14.5px}
+  .block p{font-size:13px; line-height:1.5}
+  .block .data{margin-top:10px; font-size:10.5px; line-height:1.5}
+  .block .more{margin-top:11px; min-height:30px; padding:5px 10px}
+}
 
 /* Pancartes permanentes des rubriques (état de repos + état survolé).
    Elles remplacent l'ancienne étiquette de survol : le survol ne fait
@@ -600,7 +640,9 @@ body.open #close{
   /* En portrait le globe est derrière TOUT le texte : le voile devient
      vertical, du transparent en haut vers le fond profond en bas. */
   #intro{
-    justify-content:flex-end; padding-bottom:clamp(160px,30vh,230px);
+    /* Réserve relevée : à sept rubriques la barre occupe trois rangées en
+       portrait (≈ 210 px) au lieu de deux. */
+    justify-content:flex-end; padding-bottom:clamp(178px,33vh,252px);
     background:linear-gradient(to bottom,
       rgba(3,8,20,0) 0%, rgba(3,8,20,.34) 18%, rgba(3,8,20,.82) 44%,
       rgba(3,8,20,.93) 66%, rgba(3,8,20,.97) 100%);
@@ -615,8 +657,8 @@ body.open #close{
   .tag .n{font-size:10px}
   .tag .c{display:none}
 
-  /* Barre de nœuds pleine largeur : les 5 rubriques passent sur deux lignes
-     et restent toutes visibles — pas de défilement horizontal caché. */
+  /* Barre de nœuds pleine largeur : les rubriques passent sur deux ou trois
+     lignes et restent toutes visibles — pas de défilement horizontal caché. */
   #dock{
     left:0; right:0; bottom:0; transform:none; max-width:100%;
     gap:8px; padding:0 0 max(10px,env(safe-area-inset-bottom));
@@ -629,9 +671,11 @@ body.open #close{
   }
   .navnode{
     min-width:0; min-height:44px; flex:0 0 auto;
-    padding:9px 14px; align-items:center; justify-content:center;
+    /* Resserré depuis le passage à sept entrées : gagne une entrée par rangée
+       en portrait, sans descendre sous la cible tactile de 44 px. */
+    padding:9px 11px; align-items:center; justify-content:center;
   }
-  .navnode .lbl{font-size:13px}
+  .navnode .lbl{font-size:12.5px}
   .navnode .loc{display:none}
   /* La feuille de contenu recouvre la barre : on l'escamote pendant la lecture */
   body.open #dock{opacity:0; pointer-events:none}
@@ -775,6 +819,36 @@ var RUBRIQUES = [
     ]
   },
   {
+    id: 'certifications', nom: 'Certifications', ville: 'Reykjavik', lat: 64.15, lon: -21.94,
+    blocs: [
+      { t:'CCNA — routage et commutation',
+        p:"Certification visée en premier : elle met un cadre formel sur le socle réseau que je manipule déjà tous les jours.",
+        d:'CISCO CCNA 200-301 · PASSAGE VISÉ AU PRINTEMPS 2026',
+        long:["Le CCNA est la première certification que je prépare, parce qu'elle recouvre exactement ce que je pratique : adressage, commutation, VLAN et agrégation, routage statique et OSPF, listes de contrôle d'accès, NAT et services d'infrastructure.",
+               "Ma préparation tient en trois temps. Le cours officiel Cisco pour la théorie et le vocabulaire de l'examen, un carnet de commandes annotées où je note ce qui diffère entre la version examen et ce que je rencontre réellement en production, et surtout du laboratoire : les topologies sont montées sous Packet Tracer pour les révisions rapides, puis rejouées sur des commutateurs Catalyst d'occasion pour les points où le simulateur ment.",
+               "Le rythme est d'environ six heures par semaine, réparties sur deux soirées et une plage du week-end, pour un passage visé au printemps 2026. Je m'astreins à obtenir 90 % sur trois examens blancs consécutifs avant de réserver la session : en dessous, la marge est trop mince pour un examen chronométré."] },
+      { t:'Fortinet NSE 4 — sécurité réseau',
+        p:"L'équipement que je rencontre le plus souvent en clientèle. La certification prolonge directement les chantiers de segmentation menés en alternance.",
+        d:'FORTINET NSE 4 · FORTIOS 7.4 · ENCHAÎNÉE APRÈS LE CCNA',
+        long:["Le FortiGate est le pare-feu que j'administre en alternance et celui que je retrouve dans la majorité des parcs de taille moyenne. Passer le NSE 4 revient donc à faire valider ce que je pratique déjà : politiques de sécurité, routage et interfaces virtuelles, tunnels IPsec site-à-site, inspection SSL, filtrage applicatif et journalisation.",
+               "La préparation se fait principalement sur une paire de FortiGate virtuels montés dans mon laboratoire Proxmox, avec un troisième site simulé pour tester les scénarios de bascule de tunnel. Les points qui m'ont demandé le plus de travail sont l'ordre d'évaluation des politiques et le comportement du routage par politique, deux sujets où une intuition approximative suffit en exploitation courante mais pas à l'examen.",
+               "Je vise le passage dans la foulée du CCNA, pour profiter du recouvrement entre les deux référentiels sur la partie routage plutôt que de repartir de zéro six mois plus tard."] },
+      { t:'CompTIA Security+ — socle défensif',
+        p:"Certification généraliste, utile parce qu'elle couvre la gouvernance et l'analyse de risque que la seule pratique technique ne donne pas.",
+        d:'COMPTIA SECURITY+ SY0-701 · OBJECTIF FIN 2026',
+        long:["Le Security+ n'apporte pas de compétence technique que je n'aurais pas, mais il structure une partie du métier que j'aborde autrement de façon empirique : classification des actifs, analyse de risque, cadre réglementaire, gestion de la continuité et de la conformité.",
+               "C'est aussi une certification très demandée en filtre de recrutement, et neutre vis-à-vis des constructeurs, ce qui en fait un complément cohérent d'un CCNA et d'un NSE 4 tous deux liés à un éditeur.",
+               "Je la place volontairement en dernier dans le calendrier : le référentiel est large mais peu profond, et il se révise beaucoup plus vite une fois que les deux certifications techniques sont acquises. Objectif de passage fin 2026, en fin de BTS."] },
+      { t:'Entraînement offensif continu',
+        p:"Root-Me et TryHackMe deux à trois soirs par semaine, avec un compte rendu écrit pour chaque machine résolue.",
+        d:'ROOT-ME · TRYHACKME · ~120 MACHINES · PARCOURS AD',
+        long:["Les certifications formalisent, mais elles ne remplacent pas la pratique. Je maintiens depuis deux ans un entraînement régulier sur Root-Me et TryHackMe, à raison de deux à trois soirées par semaine, avec une nette préférence pour les parcours orientés Active Directory et élévation de privilèges sous Windows.",
+               "Chaque machine résolue donne lieu à un compte rendu écrit selon un modèle constant : reconnaissance, vecteur d'entrée, chemin d'élévation, et surtout la contre-mesure qui aurait bloqué le scénario ainsi que la trace qu'il laisse côté supervision. Cette dernière partie est celle qui me sert le plus dans mon travail défensif.",
+               "Le total tourne autour de cent vingt machines. Le chiffre en lui-même ne veut pas dire grand-chose ; ce qui compte est la bibliothèque de contre-mesures documentées qu'il a produite, et qui alimente directement les procédures de durcissement que j'applique en production.",
+               "À moyen terme, je regarde l'OSCP comme aboutissement de cette pratique, mais sans le placer au calendrier : le coût et la charge de préparation ne sont réalistes qu'une fois en poste."] }
+    ]
+  },
+  {
     id: 'competences', nom: 'Compétences', ville: 'Tokyo', lat: 35.68, lon: 139.69,
     blocs: [
       { t:'Sécurité offensive',
@@ -802,6 +876,39 @@ var RUBRIQUES = [
         long:["Journaliser sans centraliser ne sert à rien : les journaux locaux sont la première chose qu'un attaquant efface. La collecte est donc poussée vers un serveur dédié, en écriture seule pour les agents.",
                "Les règles de détection sont volontairement peu nombreuses et ciblées sur les comportements réellement significatifs dans le contexte du parc, pour éviter le bruit qui finit par faire ignorer les alertes.",
                "Les procédures de réponse — isolation d'un poste, révocation de comptes, restauration — sont rédigées à froid et testées, parce qu'un incident n'est pas le bon moment pour improviser."] }
+    ]
+  },
+  {
+    id: 'procedures', nom: 'Procédures', ville: 'Wellington', lat: -41.29, lon: 174.78,
+    blocs: [
+      { t:'Réponse à incident',
+        p:"Isoler, préserver les traces, éradiquer, remettre en service. Une page par étape, écrite à froid et rejouée en exercice.",
+        d:'ISOLATION < 15 MIN · WAZUH · CHAÎNE D\'ESCALADE ÉCRITE',
+        long:["Un incident n'est pas le moment d'inventer une méthode. La procédure tient sur quatre pages, une par phase, et chacune commence par la seule question qui compte à ce moment-là : qui décide, qui exécute, qui prévient.",
+               "L'isolation vise quinze minutes entre la levée d'alerte Wazuh et la mise à l'écart du poste. Concrètement : bascule du port sur le VLAN de quarantaine, révocation des sessions Kerberos du compte concerné, et surtout interdiction formelle d'éteindre la machine tant que la mémoire vive n'a pas été capturée — c'est le réflexe le plus courant et celui qui détruit le plus de preuves.",
+               "La phase de qualification s'appuie sur les journaux déjà centralisés : recherche des connexions du compte sur les trente derniers jours, des créations de tâches planifiées et des exécutions inhabituelles. La chronologie est reconstruite dans un document horodaté qui sert ensuite de base à la déclaration éventuelle.",
+               "La remise en service passe systématiquement par une réinstallation depuis le master, jamais par un nettoyage. La procédure se termine par un retour d'expérience à quinze jours, dont la seule sortie obligatoire est la modification concrète apportée à l'infrastructure."] },
+      { t:'Durcissement d\'un serveur neuf',
+        p:"Une liste de trente-huit points appliquée avant toute mise en production, dont l'essentiel est automatisé en rôles Ansible.",
+        d:'38 POINTS · ANSIBLE · CIS BENCHMARK · RECETTE SIGNÉE',
+        long:["Aucun serveur ne rejoint le réseau de production sans être passé par la liste : renommage et sortie du compte administrateur par défaut, mise à jour complète, réduction des services et des rôles installés, pare-feu local en refus par défaut, chiffrement du disque, horodatage synchronisé et envoi des journaux vers le collecteur.",
+               "Une trentaine des trente-huit points sont portés par des rôles Ansible dérivés des recommandations CIS, ce qui rend le durcissement reproductible et surtout vérifiable : le même livre de jeu tourne en mode contrôle sur le parc existant et signale les dérives.",
+               "Les points restants sont ceux qui demandent une décision humaine — ouverture de flux, délégation d'administration, politique de sauvegarde — et font l'objet d'une recette écrite, datée et signée par l'exploitant avant la bascule.",
+               "La liste elle-même est versionnée : chaque incident ou chaque audit qui révèle un manque se traduit par une ligne supplémentaire, ce qui la fait vivre plutôt que de la laisser vieillir dans un classeur."] },
+      { t:'Sauvegarde et restauration testée',
+        p:"Une sauvegarde n'existe pas tant qu'elle n'a pas été restaurée. Test complet chaque trimestre, chronométré et consigné.",
+        d:'RÈGLE 3-2-1 · RESTAURATION TRIMESTRIELLE · RTO 4 H',
+        long:["Le plan suit la règle 3-2-1 : trois copies, sur deux supports différents, dont une hors site et déconnectée. Cette dernière copie est la seule qui protège réellement d'un rançongiciel, parce qu'elle n'est joignable par aucun compte du domaine.",
+               "La procédure de restauration décrit trois scénarios distincts : un fichier isolé demandé par un utilisateur, une machine virtuelle complète, et la reconstruction d'un contrôleur de domaine. Ils n'ont ni la même durée ni les mêmes prérequis, et les confondre dans une procédure unique revient à n'en avoir aucune.",
+               "Un test de restauration réel est mené chaque trimestre sur un environnement isolé, chronomètre en main. Le résultat est consigné avec la durée obtenue et l'écart au RTO annoncé de quatre heures. Les deux premiers tests l'ont dépassé, à cause d'un mot de passe de coffre absent de la documentation d'urgence : c'est exactement le genre de détail qu'un exercice révèle et qu'un incident réel aurait fait payer très cher.",
+               "La documentation d'urgence est imprimée et rangée hors du système d'information, puisqu'elle sert précisément quand celui-ci est indisponible."] },
+      { t:'Comptes à privilèges : entrée et sortie',
+        p:"Ouverture et fermeture des accès sur une procédure unique, avec une revue trimestrielle qui rattrape ce que les départs oublient.",
+        d:'LAPS · TIERING · REVUE TRIMESTRIELLE · BLOODHOUND',
+        long:["L'ouverture d'un compte à privilèges suit un formulaire court mais obligatoire : quel niveau du modèle en tiers, quel périmètre, quelle durée, et qui valide. Un compte d'administration est nominatif, distinct du compte bureautique de la même personne, et n'ouvre jamais de session sur un poste utilisateur.",
+               "La sortie est la partie que les organisations ratent le plus souvent, parce qu'elle n'a pas d'urgence apparente. La procédure impose donc un ordre : désactivation avant suppression, retrait des appartenances aux groupes à privilèges, révocation des accès distants et des clés, puis rotation des secrets partagés que la personne connaissait.",
+               "Une revue trimestrielle passe en revue l'ensemble des groupes à privilèges et confronte la liste aux effectifs réels. Elle est doublée d'un passage BloodHound qui vérifie qu'aucun chemin court n'est réapparu entre un utilisateur standard et les droits de domaine — les délégations se remettent en place toutes seules au fil des dépannages.",
+               "Côté administrateurs locaux, LAPS retire complètement le sujet : le mot de passe est unique par machine, renouvelé automatiquement, et sa consultation est journalisée."] }
     ]
   },
   {
@@ -879,7 +986,7 @@ function fmtCoordsOf(r) {
 /* ============================================================================
    1bis. REPLI SANS 3D
    Si three.js ou WebGL manque, on n'affiche plus seulement un message d'erreur :
-   les cinq rubriques sont rendues en document texte, dans l'ordre, avec les
+   toutes les rubriques sont rendues en document texte, dans l'ordre, avec les
    lectures longues dépliées. Le portfolio reste consultable et indexable.
    ========================================================================== */
 function renderFallbackDoc(raison) {
@@ -1498,7 +1605,7 @@ function makeArc(a, b, main) {
   return rec;
 }
 
-// Les 5 rubriques sont toutes reliées entre elles (10 arcs marqués)
+// Les rubriques sont toutes reliées entre elles (n·(n−1)/2 arcs marqués)
 for (var i1 = 0; i1 < nodes.length; i1++) {
   for (var j1 = i1 + 1; j1 < nodes.length; j1++) {
     var arc = makeArc(nodes[i1].local, nodes[j1].local, true);
@@ -1732,16 +1839,22 @@ RUBRIQUES.forEach(function (r, i) {
   var b = document.createElement('button');
   b.className = 'navnode';
   b.type = 'button';
-  b.setAttribute('aria-label', r.nom + ' — nœud ' + r.ville);
+  b.setAttribute('aria-label', r.nom + ' — rubrique ' + (i + 1) + ' sur ' + RUBRIQUES.length);
 
   var lbl = document.createElement('span'); lbl.className = 'lbl';
   var pip = document.createElement('i'); pip.className = 'pip'; pip.setAttribute('aria-hidden', 'true');
   lbl.appendChild(pip);
   lbl.appendChild(document.createTextNode(r.nom));
 
+  /* Deuxième ligne : rang dans la liste, plus le nom de la capitale.
+     La capitale ne sert qu'au placement du nœud sur le globe et n'apprend
+     rien sur la rubrique ; en la remplaçant par « rang / total » la ligne
+     garde son allure de ligne de données, reste en monospace, et devient
+     une information de repérage réellement utile maintenant qu'il y a sept
+     entrées. Le nom du lieu reste sur la pancarte du globe, où il a un sens. */
   var loc = document.createElement('span'); loc.className = 'loc';
   loc.setAttribute('aria-hidden', 'true');
-  loc.textContent = ('0' + (i + 1)) + ' · ' + r.ville.toUpperCase();
+  loc.textContent = ('0' + (i + 1)).slice(-2) + ' / ' + ('0' + RUBRIQUES.length).slice(-2);
 
   b.appendChild(lbl); b.appendChild(loc);
 
@@ -2382,7 +2495,7 @@ frame();
    balayage restent disponibles, mais ne sont plus le seul chemin. */
 document.getElementById('enter').addEventListener('click', function () {
   state.pT = 1;
-  announce('Globe interactif affiché. Cinq rubriques disponibles dans la barre de navigation.');
+  announce('Globe interactif affiché. ' + RUBRIQUES.length + ' rubriques disponibles dans la barre de navigation.');
 });
 
 /* Tactile : un balayage vertical dans l'accueil déclenche la transition.

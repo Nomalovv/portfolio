@@ -87,6 +87,89 @@ Trois défauts trouvés à ce rejeu, tous invisibles à la relecture du code :
 
 Et un détail de composition : la pastille devant les titres de cartes était centrée verticalement, donc flottait entre les deux lignes des titres qui reviennent à la ligne — alignée sur la première ligne.
 
+## Passe « sept rubriques » — Certifications et Procédures
+
+### Le menu du bas ne nomme plus les villes
+
+Les entrées de la barre affichaient `01 · PARIS`, `04 · NEW YORK`… La capitale
+ne sert qu'à poser le nœud sur le globe : elle n'apprend rien sur la rubrique, et
+avec sept entrées elle occupait de la largeur pour rien. La deuxième ligne est
+devenue `01 / 07` — même allure de ligne de données en monospace, mais une
+information de repérage réellement utile. Le nom du lieu reste là où il a un
+sens : sur la pancarte du globe, sous le titre ancré (`#anchor-coords`), dans la
+feuille mobile et dans le repli texte. L'`aria-label` suit (« Certifications —
+rubrique 3 sur 7 ») et le décompte est calculé depuis `RUBRIQUES.length`, plus
+écrit en toutes lettres.
+
+### Deux rubriques de plus
+
+- **Certifications** — Reykjavik (64,15° N / 21,94° O). CCNA, Fortinet NSE 4,
+  CompTIA Security+ et entraînement offensif continu ; cohérent avec la fiche
+  « Formation continue » de Parcours, qui annonçait déjà CCNA / NSE 4 / Root-Me /
+  TryHackMe, et qui n'a pas été touchée.
+- **Procédures** — Wellington (41,29° S / 174,78° E). Réponse à incident,
+  durcissement d'un serveur neuf, sauvegarde restaurée pour de vrai, cycle de vie
+  des comptes à privilèges. Les briques déjà citées ailleurs (Wazuh, Ansible,
+  LAPS, tiering, BloodHound) sont reprises plutôt que réinventées.
+
+Les deux capitales ont été choisies pour leur isolement : aucune n'est à moins de
+1 800 km d'un des cinq nœuds existants ni des vingt nœuds décoratifs de
+`SECONDAIRES`, donc pas de pancartes en conflit permanent. Ordre du menu :
+À propos, Parcours, **Certifications**, Compétences, **Procédures**, Projets,
+Contact — chaque nouvelle rubrique prolonge celle qui la précède.
+
+Le maillage principal passe mécaniquement de 10 à 21 arcs (n·(n−1)/2), et le
+repli texte de 5 sections / 19 fiches à 7 sections / 27 fiches.
+
+### Trois défauts trouvés au test, tous invisibles à la relecture
+
+1. **La barre n'avait droit qu'à la moitié de l'écran.** `#dock` est fixé en
+   `left:50%` sans `right`, puis recentré par `translateX(-50%)`. Un élément fixé
+   ainsi se dimensionne au « shrink-to-fit » : sa largeur *disponible* est celle
+   qui reste de 50 % au bord droit, soit la moitié du viewport. À cinq entrées la
+   barre (~700 px) tenait tout juste dans cette moitié à 1440 px ; à sept
+   (856 px) elle la dépassait et repliait sur deux rangées **dès 1600 px**.
+   Ces 52 px de hauteur perdus faisaient déborder les piles de cartes, qui
+   chevauchaient alors sous 1152 px. `width:max-content` rend à la barre sa
+   largeur naturelle, toujours bornée par `max-width` sur l'écran réel.
+2. **Écrans bas.** Deux cartes de 250 px plus la barre ne tiennent pas dans
+   768 px de haut, encore moins 640 : la gouttière était resserrée jusqu'à 4 px,
+   puis la boucle de rendu ramenait la dernière carte de force dans l'écran, ce
+   qui la faisait chevaucher la précédente. Sous `max-height:780px` les cartes
+   sont désormais rendues compactes (302 px de large, marges et corps réduits) :
+   ~40 px gagnés par carte, la pile repasse dans le budget sans rien tronquer.
+3. **Palier compact de la barre.** Entre 821 et 1279 px, sept libellés à pleine
+   taille (856 px) touchaient le bord. Les entrées y sont resserrées — la barre
+   retombe à 709 px, sur une seule rangée jusqu'à 840 px, et la cible tactile
+   garde ses 48 px de haut. En portrait, les sept entrées occupent trois rangées
+   (~210 px) au lieu de deux : la réserve de l'écran d'accueil a été relevée en
+   conséquence.
+
+`flex-wrap` a été ajouté au rail en filet de sécurité : si un jour la barre ne
+tient vraiment plus, elle passe sur deux lignes centrées au lieu de sortir de
+l'écran, et `dockReserve()` mesurant sa hauteur réelle, les cartes suivent.
+
+### Vérifications de cette passe
+
+Rejeu du test en navigateur headless (Edge Chromium piloté par puppeteer-core,
+WebGL logiciel) : **318 vérifications passées, aucune erreur console**. Le
+contrôle de chevauchement est rejoué sur les **sept** rubriques en 1440×900,
+1366×768, 1280×800, 1152×720, 1024×700, 1024×640 et 900×640 — zéro contact,
+entre cartes, avec la barre de nœuds et hors écran. La barre elle-même est
+mesurée de 1920 à 840 px : une seule rangée partout, aucune entrée coupée,
+aucun libellé sur deux lignes. S'y ajoutent `Tab` sur les sept entrées, `Entrée`,
+le piège à focus, `Échap` à deux niveaux, le focus rendu à la barre, le
+redimensionnement à chaud pendant qu'une rubrique est ouverte, le parcours mobile
+complet en 375×780, `prefers-reduced-motion` et le repli sans three.js (7
+sections, 27 fiches).
+
+Détail de méthode : en rendu logiciel la boucle tourne à quelques images par
+seconde, et l'interpolation du globe (0,10 par image) met plusieurs secondes à
+converger. Le harnais attend donc que le nœud actif soit réellement arrivé au
+centre de l'écran — l'hypothèse sur laquelle repose `layoutBlocks` — avant toute
+mesure ; sans cela, la moitié des « chevauchements » observés n'étaient que des
+captures prises en pleine animation.
+
 ## Limites connues / à savoir
 
 - Le CDN Three.js et Google Fonts nécessitent une connexion réseau au premier chargement (la carte du monde, elle, est entièrement inline). Un message s'affiche si le réseau est indisponible.
