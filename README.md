@@ -24,7 +24,7 @@ librement et un clic direct sur un nœud ouvre sa rubrique.
 
 ## Modifier le contenu
 
-Tout est dans `index.html`. Trois endroits à connaître.
+Tout est dans `index.html`. Quatre endroits à connaître.
 
 ### 1. Le texte des rubriques — `var RUBRIQUES`
 
@@ -48,12 +48,25 @@ endroit à toucher pour changer les textes. Une rubrique = un objet :
 `lat` / `lon` déplacent le nœud sur le globe. Comptez 3 ou 4 blocs par rubrique :
 au-delà, le placement anti-chevauchement manque de place sur petit écran.
 
-### 2. L'écran d'accueil — le bloc `<section id="intro">`
+### 2. Les liens LinkedIn / GitHub / courriel — `var SOCIAUX`
+
+Juste au-dessus de `RUBRIQUES` (section « 1.a »). Une entrée = un lien, avec son
+glyphe SVG écrit sur place (aucune bibliothèque d'icônes) : changez `href` pour
+changer la destination, `label` pour ce qu'annoncent les lecteurs d'écran.
+
+Ces trois liens ne sont pas rangés dans une carte : ils **flottent autour de la
+rubrique Contact**, autour du nœud. Pour les faire graviter autour d'une autre
+rubrique, déplacez le drapeau `sats: true` d'une entrée de `RUBRIQUES` à une
+autre — il n'y a rien d'autre à toucher. Sur mobile et dans la version texte,
+où il n'y a pas d'espace libre autour du nœud, ils reviennent en rangée au bas
+de la rubrique.
+
+### 3. L'écran d'accueil — le bloc `<section id="intro">`
 
 Dans le HTML, juste après `<body>` : ligne de coordonnées, nom, métier et accroche.
 Le nom du bandeau en haut à gauche se change dans `<header id="brand">`.
 
-### 3. Les couleurs — le bloc `:root` du `<style>`
+### 4. Les couleurs — le bloc `:root` du `<style>`
 
 Toute la palette est en variables CSS (`--bg-deep`, `--accent`, `--warm`, `--text`…)
 tout en haut de la feuille de style. Les couleurs 3D correspondantes (points de

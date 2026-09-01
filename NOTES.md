@@ -2,9 +2,16 @@
 
 Ce fichier documente les choix techniques et les décisions prises pendant la construction du site, pour mémoire (le cahier des charges détaillé a été fourni séparément et n'est pas reproduit ici).
 
+Il se lit dans les deux sens : les sections « Passe … » racontent **pourquoi**
+les choses sont ce qu'elles sont, dans l'ordre où elles ont été décidées ; la
+section **« Où en est le fichier »**, plus bas, décrit l'**état courant** —
+plan du fichier, modèle de données, invariants, façon de rejouer les tests.
+Avant une modification d'ampleur, commencer par celle-là, et la corriger en
+même temps que le code.
+
 ## Fichier livré
 
-- `index.html` — page unique autonome (~85 Ko), HTML/CSS/JS inline, Three.js r128 chargé en script classique depuis cdnjs (pas de modules ES) pour que le fichier fonctionne aussi en ouverture directe `file://`.
+- `index.html` — page unique autonome (~120 Ko), HTML/CSS/JS inline, Three.js r128 chargé en script classique depuis cdnjs (pas de modules ES) pour que le fichier fonctionne aussi en ouverture directe `file://`.
 - `README.md` — instructions d'ouverture et points de personnalisation rapides.
 
 ## Carte du monde du globe pointillé
@@ -288,9 +295,145 @@ satisfaite par la position **héritée** de la rubrique précédente — toutes
 finissent centrées : il faut attendre deux images réelles avant de mesurer,
 sinon on lit un calque que la boucle de rendu n'a pas encore placé.
 
+## Où en est le fichier — repères avant une grosse modification
+
+Section tenue à jour volontairement : elle décrit l'**état courant**, pas
+l'histoire (les passes ci-dessus racontent le pourquoi). À relire en premier
+avant de toucher quoi que ce soit, et à corriger en même temps que le code.
+
+### Chiffres
+
+- `index.html` — un seul fichier autonome, ~120 Ko, ~2 720 lignes : HTML, CSS
+  et JS inline, three.js r128 chargé depuis cdnjs en script classique.
+- 7 rubriques, 25 fiches de contenu, 20 nœuds décoratifs, 21 arcs principaux.
+- 33 fonctions au premier niveau du script, toutes dans `bootPortfolio()`.
+- Contenu : les **25 fiches portent « Texte à compléter. »**. Aucune n'a de
+  lecture longue (`long`) pour l'instant, donc aucun bouton « Voir en détail »
+  n'apparaît — la modale et son piège à focus existent et fonctionnent, elles
+  n'ont simplement rien à afficher tant qu'aucune fiche n'a de `long`.
+
+### Plan du fichier
+
+Feuille de style, dans l'ordre : `PALETTE + BASES` · `ÉCRAN D'ACCUEIL` ·
+`INDICATEURS EN MODE GLOBE` · `BARRE DE NŒUDS` · `CONTENU EN ORBITE` ·
+`SATELLITES DE LIENS` · `MODALE DE LECTURE LONGUE` · `FEUILLE MOBILE` ·
+`ERREUR / DIVERS`, puis la requête `max-width:820px` (portrait) et la requête
+`prefers-reduced-motion`. Ces deux dernières sont en fin de feuille et doivent
+le rester : plusieurs de leurs règles n'ont pas de `!important` et gagnent par
+l'ordre de cascade.
+
+Script, dans l'ordre : `1. DONNÉES DE CONTENU` (dont `1.a` les satellites de
+liens) · `1bis. REPLI SANS 3D` · `1ter. GARDE-FOU three.js` · `2. CARTE DU MONDE
+PROCÉDURALE` · `3. TEXTURES GÉNÉRÉES` · `4. SCÈNE` · `5. NŒUDS ET ARCS` ·
+`6. ÉTAT D'INTERACTION` · `7. ROTATION VERS UN POINT` · `8. INTERFACE` (orbite,
+anti-chevauchement, modale, feuille mobile) · `9. PROJECTION 3D → 2D` ·
+`10. BOUCLE DE RENDU`.
+
+Cet ordre porte deux contraintes réelles : `RUBRIQUES` et `renderFallbackDoc()`
+sont déclarés **avant** le garde-fou three.js (sans WebGL, le contenu doit
+rester lisible), et tout le code d'initialisation est enveloppé dans un
+`try/catch` pour que le repli fonctionne vraiment quand quelque chose casse.
+
+### Modèle de données
+
+```
+RUBRIQUES[] = { id, nom, ville, lat, lon, sats?, blocs[] }
+   blocs[]  = { t, p, d?, html?, long?[] }
+SOCIAUX[]   = { id, nom, href, label, externe?, svg }
+SECONDAIRES = [ [nom, lat, lon], … ]   // nœuds décoratifs, sans contenu
+```
+
+- `id`, `ville`, `lat`, `lon` sont du **câblage** : la barre de nœuds, les
+  pancartes, les arcs, les boutons de collision et le repli texte s'y accrochent.
+  Changer l'ordre ou le nombre d'entrées de `RUBRIQUES` se répercute partout
+  automatiquement (le décompte « 3 sur 7 » est calculé, jamais écrit), mais
+  renommer un `id` ou déplacer une capitale demande de vérifier les pancartes
+  voisines : deux capitales trop proches se chevauchent sur le globe.
+- `d` + `html:true` = contenu HTML injecté tel quel dans la fiche (un lien, par
+  exemple). Sans `html`, `d` est posé en texte.
+- `long` = tableau de paragraphes ; sa seule présence fait apparaître le bouton
+  « Voir en détail » et alimente la modale.
+- `sats:true` = la rubrique porte les trois liens en orbite. **Un seul drapeau à
+  déplacer** pour changer de rubrique d'accueil ; rien d'autre à toucher.
+
+### Les trois rendus du même contenu
+
+Toute fiche est rendue trois fois, par trois chemins distincts :
+
+1. **cartes en orbite** (desktop) — `openRubrique()` construit les `.block`,
+   `layoutBlocks()` les range en deux colonnes autour du nœud, la boucle de
+   rendu les suit à chaque image ;
+2. **feuille mobile** (`≤ 820 px`) — `buildSheet()` ;
+3. **repli texte** (pas de three.js ou pas de WebGL) — `renderFallbackDoc()`,
+   lectures longues dépliées, défilement rendu au navigateur.
+
+**Règle d'or : tout ajout de contenu doit traverser les trois.** C'est l'erreur
+la plus facile à commettre ici — le rendu desktop est celui qu'on regarde, les
+deux autres sont ceux qu'on oublie.
+
+### Invariants à ne pas casser
+
+- **Un seul draw call pour la carte du monde** (12 498 points dans un
+  `THREE.Points`). Les arcs sont des objets séparés, c'est assumé.
+- **Aucune ressource externe hors CDN** : la carte du monde est générée sur un
+  canvas, pas chargée — pas de `fetch`, pas d'image, donc pas de canvas *tainted*
+  en `file://`.
+- **`z-index`** : pancartes 4 < contenu en orbite et satellites 5 < feuille
+  mobile 8 < modale. Les pancartes sont passées sous les cartes pour une raison
+  (elles transparaissaient au travers), la croix de fermeture passe sous le voile
+  de la modale pour une autre (deux croix concurrentes).
+- **Cible tactile ≥ 44 px** partout (barre, croix, boutons, satellites) et anneau
+  de focus unique pour toute la page.
+- **`prefers-reduced-motion` coupe tout mouvement**, y compris les orbites et les
+  impulsions le long des arcs.
+- **Le clavier doit tout atteindre** : la barre de nœuds est le chemin garanti,
+  les boutons de collision du globe sont hors de l'ordre de tabulation.
+- **Aucune carte ne doit chevaucher une autre, ni la barre de nœuds, ni sortir
+  de l'écran** — c'est la contrainte qui a coûté le plus de reprises ;
+  `layoutBlocks()` la garantit tant que la place existe, et le contrôle est
+  rejoué à chaque passe sur toutes les tailles.
+
+### Comment rejouer les tests
+
+Il n'y a pas de dépendance dans le dépôt : le harnais est monté à part, hors du
+dépôt, et jeté après usage.
+
+```
+mkdir %TEMP%\pfharness && cd %TEMP%\pfharness
+npm init -y && npm install puppeteer-core
+node check.js
+```
+
+Ce qui compte dans le harnais, et qui a été appris à la dure :
+
+- Edge Chromium en `headless:'new'`, lancé avec `--use-gl=angle
+  --use-angle=swiftshader --enable-unsafe-swiftshader` : le rendu WebGL logiciel
+  suffit, mais il tourne à quelques images par seconde.
+- **Redimensionner à chaud plutôt que recharger** : une dizaine de contextes
+  WebGL logiciels d'affilée finissent par faire tomber le rendu (« Navigating
+  frame was detached »). C'est de toute façon le cas réel à couvrir.
+- **Attendre l'arrivée réelle du nœud au centre** avant toute mesure —
+  `layoutBlocks()` repose sur cette hypothèse — puis **deux images** de plus :
+  la condition d'arrivée peut être satisfaite par la position héritée de la
+  rubrique précédente, toutes finissant centrées.
+- Mesurer des géométries (`getBoundingClientRect`) et des styles calculés, pas
+  des captures : c'est ce qui attrape les chevauchements et les régressions de
+  style. Les captures servent à juger la composition, pas à valider.
+- Les tailles qui trouvent des défauts : 1920×1080, 1440×900, 1366×768,
+  1280×800, 1152×720, 1024×700, 900×640, 830×760, 821×640 (le palier desktop le
+  plus étroit), et 375×780 en portrait. Plus `prefers-reduced-motion` et le repli
+  three.js bloqué (interception de requête).
+
+### Ce qui reste à faire
+
+- **Écrire le contenu** : les 25 fiches sont à remplir, et les lectures longues
+  (`long`) sont à ajouter là où elles ont un sens — c'est ce qui réveillera le
+  bouton « Voir en détail » et la modale.
+- **Pages GitHub** : la mise en ligne n'est pas encore configurée.
+
 ## Limites connues / à savoir
 
 - Le CDN Three.js et Google Fonts nécessitent une connexion réseau au premier chargement (la carte du monde, elle, est entièrement inline). Un message s'affiche si le réseau est indisponible.
 - Les tracés côtiers sont volontairement simplifiés (~40 à 70 sommets par continent) : lisibles à l'échelle du globe, approximatifs si on zoomait fortement.
 - Les trois destinations de `SOCIAUX` sont réelles : adresse courriel de l'utilisateur (gardée volontairement, décision explicite), profil LinkedIn et compte GitHub `Nomalovv`. Elles flottent autour de la rubrique **Contact**, hors de toute carte.
-- Tout le reste du contenu (parcours, compétences, projets) est un placeholder réaliste à adapter.
+- Les 25 fiches de contenu portent toutes « Texte à compléter. » : le contenu réel reste à écrire (voir « Ce qui reste à faire » ci-dessus).
