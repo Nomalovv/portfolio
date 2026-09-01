@@ -383,7 +383,7 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .block a:hover{border-bottom-color:rgba(0,212,255,.9); color:#d5faff}
 
 /* ============================================================
-   SATELLITES DE LIENS — rubrique Projets
+   SATELLITES DE LIENS — rubrique Contact
    Une destination = un glyphe seul, SANS carte : ni vitre, ni bordure,
    ni ombre portée de boîte. Ce sont des corps libres qui flottent dans
    l'espace de la rubrique, au même titre que les nœuds décoratifs du
@@ -413,7 +413,7 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .socials.field .orb{position:absolute}
 /* Variante en flux : feuille mobile et repli texte, où il n'y a pas d'espace
    libre à occuper. Une simple rangée posée dans la page, toujours sans cadre. */
-.socials.row{display:flex; flex-wrap:wrap; gap:16px; margin:16px 0 2px}
+.socials.row{display:flex; flex-wrap:wrap; gap:18px; margin:16px 0 2px}
 /* --- Couche 1 : l'orbite ---------------------------------------------------
    Chaque satellite décrit une petite ellipse autour de son point d'ancrage,
    comme les nœuds qui tournent avec le globe. Trois durées, trois phases et
@@ -438,23 +438,25 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
   100%{transform:translate(0,-4.2px)}
 }
 /* --- Couche 2 : le glyphe libre --------------------------------------------
-   Aucun fond, aucune bordure : la surface reste cliquable sur 48 px (la cible
-   tactile de 44 px est tenue), mais rien ne la dessine. Ce qui détache le
-   glyphe du globe, c'est son ombre portée — pas une boîte. */
+   Aucun fond, aucune bordure : la surface reste cliquable sur 68 px (bien
+   au-delà de la cible tactile de 44 px), mais rien ne la dessine. Ce qui
+   détache le glyphe du globe, c'est son ombre portée — pas une boîte. Elle
+   est calée sur la taille du dessin : plus le glyphe est grand, plus l'ombre
+   s'étale, sinon elle se lit comme un liseré au lieu d'un décollement. */
 a.social{
   position:relative; pointer-events:auto;
   display:inline-flex; align-items:center; justify-content:center;
-  flex:none; width:48px; height:48px;
+  flex:none; width:68px; height:68px;
   border:0; border-radius:50%; background:none; box-shadow:none;
   color:var(--text-dim); text-decoration:none;
-  filter:drop-shadow(0 2px 9px rgba(3,8,20,.95));
+  filter:drop-shadow(0 3px 13px rgba(3,8,20,.95));
   transition:color .3s var(--ease), transform .45s var(--ease-out),
              filter .35s var(--ease);
 }
 /* Halo de survol : un dégradé radial qui s'éteint avant le bord — il éclaire
    le glyphe sans jamais tracer de contour, donc sans recréer une carte. */
 a.social::before{
-  content:""; position:absolute; inset:-3px; border-radius:50%; pointer-events:none;
+  content:""; position:absolute; inset:-4px; border-radius:50%; pointer-events:none;
   background:radial-gradient(circle,rgba(0,212,255,.24),rgba(0,212,255,0) 70%);
   opacity:0; transition:opacity .3s var(--ease);
 }
@@ -462,13 +464,13 @@ a.social::before{
    Une boucle infinie serait de la décoration ; ici l'onde signifie le
    contact établi, exactement comme les arcs entre les nœuds du globe. */
 a.social::after{
-  content:""; position:absolute; inset:2px; border-radius:50%; pointer-events:none;
+  content:""; position:absolute; inset:4px; border-radius:50%; pointer-events:none;
   border:1px solid var(--accent); opacity:0;
 }
 a.social:hover,a.social:focus-visible{
   color:var(--accent-soft);
   transform:translateY(-3px);
-  filter:drop-shadow(0 4px 14px rgba(0,212,255,.55));
+  filter:drop-shadow(0 5px 20px rgba(0,212,255,.55));
 }
 a.social:hover::before,a.social:focus-visible::before{opacity:1}
 a.social:hover::after,a.social:focus-visible::after{animation:social-ping .85s var(--ease-out) 1}
@@ -478,7 +480,14 @@ a.social:active{transform:translateY(-1px) scale(.96)}
   0%{opacity:.85; transform:scale(1)}
   100%{opacity:0; transform:scale(1.3)}
 }
-a.social svg{width:26px; height:26px; display:block}
+a.social svg{width:36px; height:36px; display:block}
+/* Palier resserré : sur un écran desktop étroit ET bas, les trois satellites
+   à pleine taille ne tiennent plus dans la bande centrale laissée libre par
+   les cartes. Plutôt que d'aller heurter une carte ou la barre de nœuds, ils
+   se réduisent — sans jamais descendre sous la cible tactile de 44 px. Posé
+   par layoutSats(), qui est seul à savoir si la place existe. */
+#sats.tight a.social{width:52px; height:52px}
+#sats.tight a.social svg{width:28px; height:28px}
 /* Signature visuelle : le cadre du logo se retrace, comme une liaison qui
    s'établit. Le glyphe, lui, ne bouge pas — un seul mouvement porteur de
    sens par pastille, le reste n'est que couleur et lumière. */
@@ -890,7 +899,7 @@ var isMobile = function () { return window.innerWidth <= 820; };
    Déclarées AVANT le garde-fou three.js : sans WebGL le globe disparaît, mais
    le contenu, lui, doit rester lisible (voir renderFallbackDoc plus bas).
    ========================================================================== */
-/* --- 1.a Satellites de liens (rubrique Projets) ----------------------------
+/* --- 1.a Satellites de liens (rubrique Contact) ----------------------------
    Une entrée = un satellite qui flotte autour de la rubrique. Les glyphes sont
    des SVG écrits ici même : aucune dépendance à une bibliothèque d'icônes.
    Chaque SVG se compose de deux parties, et c'est ce que la feuille de style
@@ -997,9 +1006,6 @@ var RUBRIQUES = [
   },
   {
     id: 'projets', nom: 'Projets', ville: 'New York', lat: 40.71, lon: -74.01,
-    // « sats » : les trois liens (LinkedIn, GitHub, courriel) gravitent autour
-    // de cette rubrique, hors des cartes — voir SOCIAUX et buildSats().
-    sats: true,
     blocs: [
       { t:'Projet 1', p:"Texte à compléter." },
       { t:'Projet 2', p:"Texte à compléter." },
@@ -1008,14 +1014,17 @@ var RUBRIQUES = [
   },
   {
     id: 'contact', nom: 'Contact', ville: 'Singapour', lat: 1.35, lon: 103.82,
+    // « sats » : les trois liens (LinkedIn, GitHub, courriel) gravitent autour
+    // de la rubrique — autour du nœud, jamais dans une carte. Voir SOCIAUX,
+    // buildSats() et layoutSats().
+    sats: true,
     blocs: [
       { t:'Courriel',
         p:"Texte à compléter.",
         d:'<a href="mailto:arthur.formentin@sts-sio-caen.info">arthur.formentin@sts-sio-caen.info</a>',
         html:true },
-      // Les liens LinkedIn / GitHub ne sont plus ici : ils gravitent autour de
-      // la rubrique Projets. Contact garde ses deux cartes, la seconde revient
-      // au sujet qu'elle traitait avant, sans cadre vide à moitié rempli.
+      // Les liens ne sont plus dans une carte : ils flottent autour de la
+      // rubrique (voir « sats » ci-dessus). Les deux cartes restent du texte.
       { t:'Disponibilité',
         p:"Texte à compléter." }
     ]
@@ -2114,19 +2123,43 @@ function layoutBlocks(px, py) {
    coordonnées. Si l'écran est trop étroit pour que ce triangle passe entre
    les deux colonnes de cartes, les trois descendent en chapelet sous le nœud
    plutôt que d'aller heurter une carte. */
-var SAT_R = 24;          // demi-côté d'un satellite (48 px)
+var SAT_FULL = 34;       // demi-côté d'un satellite à pleine taille (68 px)
+var SAT_TIGHT = 26;      // demi-côté au palier resserré (52 px)
+var satR = SAT_FULL;     // rayon courant, relu par la boucle de rendu
 function layoutSats(px, py, bandL, bandR, HB, M) {
   if (!sats.length) return;
-  var room = Math.min(bandL, bandR) - 34;        // respiration gardée avec les cartes
-  var dx = Math.min(158, room);
-  var down = Math.max(84, Math.min(118, HB - M - SAT_R - py));
-  var off;
-  if (dx >= 82) {
-    off = [[-dx, -70], [dx, -70], [0, down]];
+  // Bande centrale libre, moins la respiration gardée avec les cartes.
+  var room = Math.min(bandL, bandR) - 10;
+  var tight = room - SAT_FULL < 100;             // la bande les prend-elle en grand ?
+  var r = tight ? SAT_TIGHT : SAT_FULL;
+  var off, step;
+
+  if (room - r >= 100) {
+    // Composition visée : le triangle. Deux satellites encadrent le titre de
+    // la rubrique, le troisième descend sous les coordonnées.
+    var dx = Math.min(162, room - r);
+    var down = Math.max(r + 66, Math.min(132, HB - 16 - r - py));
+    off = [[-dx, -78], [dx, -78], [0, down]];
   } else {
-    var step = Math.max(50, Math.min(58, (HB - M - SAT_R - (py + 84)) / 2));
-    off = [[0, 84], [0, 84 + step], [0, 84 + step * 2]];
+    // Bande centrale mangée par les cartes : les trois s'alignent dans l'axe
+    // du nœud plutôt que d'aller en heurter une. Toujours resserrés — s'il n'y
+    // avait pas la largeur, il n'y a pas non plus la hauteur en grande taille.
+    // Le pas reste plus grand qu'un satellite, sinon ils se recouvriraient.
+    tight = true; r = SAT_TIGHT;
+    var below = (HB - 16 - r - (py + 84)) / 2;   // pas disponible vers le bas
+    if (below >= r * 2 + 6) {
+      step = Math.min(r * 2 + 14, below);
+      off = [[0, 84], [0, 84 + step], [0, 84 + step * 2]];
+    } else {
+      // Vers le haut : au-dessus du titre l'espace reste libre en toute
+      // circonstance, les cartes étant rangées de part et d'autre du nœud.
+      step = Math.max(r * 2 + 6, Math.min(r * 2 + 14, (py - 16 - r - 94) / 2));
+      off = [[0, -94], [0, -94 - step], [0, -94 - step * 2]];
+    }
   }
+
+  satR = r;
+  elSats.classList.toggle('tight', tight);
   for (var k = 0; k < sats.length; k++) {
     var o = off[k % off.length];
     sats[k].offX = o[0];
@@ -2147,6 +2180,8 @@ function clearSats() {
   sats = [];
   elSats.innerHTML = '';
   elSats.style.opacity = '0';
+  elSats.classList.remove('tight');
+  satR = SAT_FULL;
 }
 
 function buildSats(r) {
@@ -2629,8 +2664,8 @@ function frame() {
     if (sats.length) {
       for (var si = 0; si < sats.length; si++) {
         var sa = sats[si];
-        var sx = Math.max(14, Math.min(W - 14 - SAT_R * 2, ax + sa.offX - SAT_R));
-        var sy = Math.max(14, Math.min(H - 14 - SAT_R * 2, ay + sa.offY - SAT_R));
+        var sx = Math.max(14, Math.min(W - 14 - satR * 2, ax + sa.offX - satR));
+        var sy = Math.max(14, Math.min(H - 14 - satR * 2, ay + sa.offY - satR));
         sa.el.style.left = sx + 'px';
         sa.el.style.top = sy + 'px';
       }
