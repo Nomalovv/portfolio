@@ -443,27 +443,9 @@ a.social .frame{
 a.social:hover .frame,a.social:focus-visible .frame{opacity:1; animation:social-trace .9s var(--ease-out) 1}
 @keyframes social-trace{from{stroke-dashoffset:96} to{stroke-dashoffset:0}}
 a.social .glyph{fill:currentColor}
-/* Étiquette survolée, calquée sur les pancartes des nœuds du globe */
-a.social .cap{
-  position:absolute; left:50%; bottom:calc(100% + 8px);
-  transform:translate(-50%,4px);
-  padding:3px 8px; border-radius:6px; white-space:nowrap;
-  font-family:var(--font-mono); font-size:10px; letter-spacing:.05em;
-  color:var(--accent-soft);
-  background:rgba(4,12,24,.92); border:1px solid var(--glass-brd);
-  opacity:0; pointer-events:none;
-  transition:opacity .25s var(--ease), transform .25s var(--ease-out);
-}
-a.social:hover .cap,a.social:focus-visible .cap{opacity:1; transform:translate(-50%,0)}
-/* Sans survol (tactile), l'étiquette ne doit pas être le seul moyen de savoir
-   où mène la pastille : elle passe en clair, à côté du glyphe. */
-@media (hover:none){
-  a.social{width:auto; min-width:44px; padding:0 13px; gap:9px}
-  a.social .cap{
-    position:static; transform:none; opacity:1;
-    padding:0; border:0; background:none; color:inherit; font-size:11px;
-  }
-}
+/* Pas d'étiquette dessinée : les pastilles sont muettes, le glyphe porte tout.
+   La destination reste annoncée par « aria-label » aux lecteurs d'écran, et
+   « title » fournit l'infobulle native du navigateur au survol prolongé. */
 /* Contextes où un « a » est stylé par un sélecteur d'identifiant */
 #sheet a.social,#fatal.doc a.social{color:var(--text-dim); border-bottom-color:var(--glass-brd)}
 #sheet a.social:hover,#sheet a.social:focus-visible,
@@ -858,45 +840,53 @@ var isMobile = function () { return window.innerWidth <= 820; };
    ici même : aucune dépendance à une bibliothèque d'icônes externe.
    Chaque SVG se compose de deux parties, et c'est ce que la feuille de style
    anime : « frame » (le cadre, retracé au survol) et « glyph » (le symbole).
-   Pour ajouter le courriel ou le dépôt GitHub le moment venu, il suffit de
-   décommenter l'entrée correspondante et d'y mettre l'adresse réelle. */
+   Ajouter une destination = ajouter une entrée ici, rien d'autre.
+   « externe » ouvre le lien dans un nouvel onglet ; le courriel s'en passe,
+   un mailto n'a pas à laisser une page blanche derrière lui. */
 var SOCIAUX = [
   {
     id: 'linkedin',
     nom: 'LinkedIn',
     href: 'https://www.linkedin.com/in/arthur-formentin-907296362/',
     label: 'Profil LinkedIn d’Arthur Formentin (nouvel onglet)',
+    externe: true,
     svg: '<rect class="frame" x="1.7" y="1.7" width="20.6" height="20.6" rx="4.6"/>' +
          '<g class="glyph">' +
          '<circle cx="7.1" cy="7.6" r="1.55"/>' +
          '<rect x="5.85" y="10" width="2.5" height="8.15" rx=".4"/>' +
          '<path d="M10.9 18.15V10h2.4v1.12h.04c.43-.78 1.37-1.37 2.67-1.37 2.28 0 2.99 1.4 2.99 3.56v4.84h-2.5v-4.34c0-1.06-.02-2.43-1.5-2.43-1.5 0-1.74 1.15-1.74 2.35v4.42z"/>' +
          '</g>'
+  },
+  {
+    id: 'github',
+    nom: 'GitHub',
+    href: 'https://github.com/Nomalovv',
+    label: 'Profil GitHub d’Arthur Formentin (nouvel onglet)',
+    externe: true,
+    svg: '<circle class="frame" cx="12" cy="12" r="10.3"/>' +
+         '<path class="glyph" d="M12 5.1a7 7 0 00-2.21 13.64c.35.06.48-.15.48-.34v-1.2c-1.95.42-2.36-.94-2.36-.94-.32-.81-.78-1.03-.78-1.03-.64-.44.05-.43.05-.43.7.05 1.07.73 1.07.73.63 1.07 1.65.76 2.05.58.06-.46.25-.77.45-.94-1.56-.18-3.2-.78-3.2-3.47 0-.77.28-1.4.73-1.89-.07-.18-.32-.9.07-1.87 0 0 .6-.19 1.96.72a6.8 6.8 0 013.56 0c1.36-.91 1.95-.72 1.95-.72.4.97.15 1.69.08 1.87.46.49.73 1.12.73 1.89 0 2.7-1.65 3.29-3.22 3.46.26.22.48.65.48 1.31v1.94c0 .19.13.41.49.34A7 7 0 0012 5.1z"/>'
+  },
+  {
+    id: 'mail',
+    nom: 'Courriel',
+    href: 'mailto:arthur.formentin@sts-sio-caen.info',
+    label: 'Écrire à arthur.formentin@sts-sio-caen.info',
+    svg: '<rect class="frame" x="1.9" y="5" width="20.2" height="14" rx="3.2"/>' +
+         '<path class="glyph" d="M3.6 7.1l8.4 5.7 8.4-5.7v2.1L12 15 3.6 9.2z"/>'
   }
-  // Emplacements prêts à l'emploi — décommenter et compléter « href » :
-  // {
-  //   id: 'mail', nom: 'Courriel', href: 'mailto:ADRESSE',
-  //   label: 'Écrire un courriel',
-  //   svg: '<rect class="frame" x="1.7" y="4.4" width="20.6" height="15.2" rx="3.2"/>' +
-  //        '<path class="glyph" d="M3.6 7.2l8.4 5.6 8.4-5.6v1.9L12 14.6 3.6 9.1z"/>'
-  // },
-  // {
-  //   id: 'github', nom: 'GitHub', href: 'https://github.com/COMPTE',
-  //   label: 'Profil GitHub (nouvel onglet)',
-  //   svg: '<circle class="frame" cx="12" cy="12" r="10.3"/>' +
-  //        '<path class="glyph" d="M12 5.1a7 7 0 00-2.21 13.64c.35.06.48-.15.48-.34v-1.2c-1.95.42-2.36-.94-2.36-.94-.32-.81-.78-1.03-.78-1.03-.64-.44.05-.43.05-.43.7.05 1.07.73 1.07.73.63 1.07 1.65.76 2.05.58.06-.46.25-.77.45-.94-1.56-.18-3.2-.78-3.2-3.47 0-.77.28-1.4.73-1.89-.07-.18-.32-.9.07-1.87 0 0 .6-.19 1.96.72a6.8 6.8 0 013.56 0c1.36-.91 1.95-.72 1.95-.72.4.97.15 1.69.08 1.87.46.49.73 1.12.73 1.89 0 2.7-1.65 3.29-3.22 3.46.26.22.48.65.48 1.31v1.94c0 .19.13.41.49.34A7 7 0 0012 5.1z"/>'
-  // }
 ];
 
 /* Rend la rangée. Le résultat est injecté tel quel dans le champ « d » d'un
    bloc marqué « html:true » — donc identique sur le globe, sur la feuille
-   mobile et dans le repli texte sans WebGL. */
+   mobile et dans le repli texte sans WebGL.
+   Les pastilles n'affichent aucun texte : le nom part dans « aria-label »
+   pour les lecteurs d'écran et dans « title » pour l'infobulle native. */
 function socialsHTML() {
   return '<span class="socials">' + SOCIAUX.map(function (s) {
-    return '<a class="social" href="' + s.href + '" target="_blank" rel="noopener noreferrer"' +
-           ' aria-label="' + s.label + '">' +
+    return '<a class="social" href="' + s.href + '"' +
+           (s.externe ? ' target="_blank" rel="noopener noreferrer"' : '') +
+           ' aria-label="' + s.label + '" title="' + s.nom + '">' +
            '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + s.svg + '</svg>' +
-           '<span class="cap" aria-hidden="true">' + s.nom + '</span>' +
            '</a>';
   }).join('') + '</span>';
 }
@@ -964,11 +954,9 @@ var RUBRIQUES = [
         html:true },
       { t:'Réseaux',
         p:"Texte à compléter.",
-        // Rangée de pastilles : LinkedIn seul pour l'instant. Les emplacements
-        // courriel et GitHub attendent, commentés, dans SOCIAUX plus haut.
+        // Rangée de pastilles icône seule — voir SOCIAUX plus haut.
         d:socialsHTML(),
-        html:true },
-      { t:'Disponibilité', p:"Texte à compléter." }
+        html:true }
     ]
   }
 ];
