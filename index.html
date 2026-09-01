@@ -396,23 +396,33 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
    Les sélecteurs portent sur « a.social » et non « .social » pour repasser
    devant les liens texte de .block / #sheet, qui sont soulignés.
    ============================================================ */
-.socials{
-  display:flex; flex-wrap:wrap; align-items:flex-start;
-  gap:18px;            /* trois cartes nettement détachées, pas un bloc compact */
-  padding:6px 0 10px;  /* garde l'onde et le flottement hors des bords de la carte */
-}
+/* Champ d'orbite : les cartes ne sont pas rangées côte à côte, elles sont
+   dispersées sur le pourtour de la carte « Réseaux ». Le champ réserve sa
+   hauteur dans le flux, les satellites y sont placés en absolu — le moteur
+   de placement mesure la hauteur réelle des cartes, il s'y adapte seul.
+   Les décalages négatifs les font mordre vers les bords du cadre sans jamais
+   sortir de la marge intérieure, que « overflow:hidden » couperait. */
+.socials{display:block; position:relative; height:150px; margin-top:12px}
 /* --- Couche 1 : l'orbite ---------------------------------------------------
-   Chaque carte décrit une petite ellipse autour de sa propre position, comme
-   les nœuds qui tournent avec le globe. Trois durées, trois phases et un sens
-   inversé au centre : rien ne bat la mesure ensemble. L'amplitude tient en
-   trois pixels — on doit le sentir sans jamais le regarder. */
-.socials .orb{display:inline-flex; animation:social-orbit 9s linear infinite}
-.socials .orb:nth-child(1){animation-duration:8.4s; animation-delay:-1.1s}
-.socials .orb:nth-child(2){
-  animation-duration:10.6s; animation-delay:-4.7s; animation-direction:reverse;
-  margin-top:5px;
+   Trois ancrages distincts — bord gauche en haut, bord droit à mi-hauteur,
+   bord bas au centre : un triangle, jamais une rangée. Chaque carte décrit
+   ensuite une petite ellipse autour de son point d'ancrage, comme les nœuds
+   qui tournent avec le globe. Trois durées, trois phases et un sens inversé
+   au centre : rien ne bat la mesure ensemble. L'amplitude tient en trois
+   pixels — on doit le sentir sans jamais le regarder. */
+.socials .orb{position:absolute; display:inline-flex; animation:social-orbit 9s linear infinite}
+.socials .orb:nth-child(1){
+  left:-6px; top:0;
+  animation-duration:8.4s; animation-delay:-1.1s;
 }
-.socials .orb:nth-child(3){animation-duration:9.3s; animation-delay:-6.2s; margin-top:1px}
+.socials .orb:nth-child(2){
+  right:-6px; top:46px;
+  animation-duration:10.6s; animation-delay:-4.7s; animation-direction:reverse;
+}
+.socials .orb:nth-child(3){
+  left:calc(50% - 29px); bottom:-2px;
+  animation-duration:9.3s; animation-delay:-6.2s;
+}
 /* L'orbite se fige dès qu'on vise la carte : la cible ne se dérobe pas sous
    le curseur, et l'attention n'est plus disputée pendant la lecture. */
 .socials .orb:hover,.socials .orb:focus-within{animation-play-state:paused}
@@ -506,6 +516,10 @@ a.social .glyph{fill:currentColor}
   .block p{font-size:13px; line-height:1.5}
   .block .data{margin-top:10px; font-size:10.5px; line-height:1.5}
   .block .more{margin-top:11px; min-height:30px; padding:5px 10px}
+  /* Écran bas : le champ d'orbite se resserre comme le reste de la carte,
+     les trois ancrages gardent leur triangle. */
+  .block .socials{height:126px; margin-top:8px}
+  .block .socials .orb:nth-child(2){top:34px}
 }
 
 /* Pancartes permanentes des rubriques (état de repos + état survolé).
