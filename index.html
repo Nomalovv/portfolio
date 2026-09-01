@@ -383,31 +383,72 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .block a:hover{border-bottom-color:rgba(0,212,255,.9); color:#d5faff}
 
 /* ============================================================
-   RANGÉE DE LIENS — rubrique Contact
-   Structure volontairement générique : une pastille = un <a class="social">
-   contenant un SVG inline (cadre tracé + glyphe). Ajouter une icône
-   (courriel, dépôt…) ne demande qu'une entrée de plus dans SOCIAUX,
-   côté script — rien à toucher ici.
+   CARTES DE LIENS — rubrique Contact
+   Une destination = une petite carte autonome, dans le même vocabulaire
+   que les cartes de contenu : vitre, liseré de connexion sur l'arête
+   haute, bordure et ombre portée. Trois couches, chacune son rôle, pour
+   qu'aucune ne se marche dessus sur la propriété « transform » :
+     .orb        le flottement orbital permanent
+     a.social    la carte elle-même et l'interaction survol/focus
+     svg         le glyphe, dont le cadre se retrace
+   Ajouter une destination ne demande qu'une entrée dans SOCIAUX, côté
+   script — rien à toucher ici.
    Les sélecteurs portent sur « a.social » et non « .social » pour repasser
    devant les liens texte de .block / #sheet, qui sont soulignés.
    ============================================================ */
-.socials{display:flex; flex-wrap:wrap; gap:10px; padding-top:2px}
+.socials{
+  display:flex; flex-wrap:wrap; align-items:flex-start;
+  gap:18px;            /* trois cartes nettement détachées, pas un bloc compact */
+  padding:6px 0 10px;  /* garde l'onde et le flottement hors des bords de la carte */
+}
+/* --- Couche 1 : l'orbite ---------------------------------------------------
+   Chaque carte décrit une petite ellipse autour de sa propre position, comme
+   les nœuds qui tournent avec le globe. Trois durées, trois phases et un sens
+   inversé au centre : rien ne bat la mesure ensemble. L'amplitude tient en
+   trois pixels — on doit le sentir sans jamais le regarder. */
+.socials .orb{display:inline-flex; animation:social-orbit 9s linear infinite}
+.socials .orb:nth-child(1){animation-duration:8.4s; animation-delay:-1.1s}
+.socials .orb:nth-child(2){
+  animation-duration:10.6s; animation-delay:-4.7s; animation-direction:reverse;
+  margin-top:5px;
+}
+.socials .orb:nth-child(3){animation-duration:9.3s; animation-delay:-6.2s; margin-top:1px}
+/* L'orbite se fige dès qu'on vise la carte : la cible ne se dérobe pas sous
+   le curseur, et l'attention n'est plus disputée pendant la lecture. */
+.socials .orb:hover,.socials .orb:focus-within{animation-play-state:paused}
+@keyframes social-orbit{
+  0%  {transform:translate(0,-3.2px)}
+  12.5%{transform:translate(1.8px,-2.3px)}
+  25% {transform:translate(2.5px,0)}
+  37.5%{transform:translate(1.8px,2.3px)}
+  50% {transform:translate(0,3.2px)}
+  62.5%{transform:translate(-1.8px,2.3px)}
+  75% {transform:translate(-2.5px,0)}
+  87.5%{transform:translate(-1.8px,-2.3px)}
+  100%{transform:translate(0,-3.2px)}
+}
+/* --- Couche 2 : la carte --------------------------------------------------- */
 a.social{
   position:relative;
   display:inline-flex; align-items:center; justify-content:center;
-  flex:none; width:44px; height:44px;   /* cible tactile 44 px, écart 10 px */
-  border:1px solid rgba(0,212,255,.32); border-radius:12px;
-  background:rgba(0,212,255,.05);
+  flex:none; width:58px; height:58px;   /* bien au-delà de la cible de 44 px */
+  border:1px solid var(--glass-brd); border-radius:12px;
+  background:var(--glass);
+  -webkit-backdrop-filter:blur(18px) saturate(1.3);
+  backdrop-filter:blur(18px) saturate(1.3);
+  box-shadow:0 14px 34px -18px rgba(0,0,0,.9), inset 0 1px 0 rgba(143,199,232,.06);
   color:var(--text-dim); text-decoration:none;
   transition:color .3s var(--ease), border-color .3s var(--ease),
              background-color .3s var(--ease), transform .45s var(--ease-out),
              box-shadow .35s var(--ease);
 }
-/* Halo : le même vocabulaire lumineux que les points du globe */
+/* Liseré de connexion sur l'arête haute — exactement celui des cartes de
+   contenu, resserré pour ne pas déborder des angles arrondis. */
 a.social::before{
-  content:""; position:absolute; inset:-1px; border-radius:inherit; pointer-events:none;
-  background:radial-gradient(62% 62% at 50% 38%, rgba(0,212,255,.32), transparent 72%);
-  opacity:0; transition:opacity .35s var(--ease);
+  content:""; position:absolute; left:11px; right:11px; top:0; height:1px;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.55),transparent);
+  transition:opacity .3s var(--ease); opacity:.75;
 }
 /* Onde de connexion : UN seul ping, émis à la prise de survol/focus.
    Une boucle infinie serait de la décoration ; ici l'onde signifie le
@@ -421,7 +462,7 @@ a.social:hover,a.social:focus-visible{
   border-color:var(--glass-brd-hi);
   background:rgba(0,212,255,.13);
   transform:translateY(-3px);
-  box-shadow:0 12px 28px -14px rgba(0,212,255,.75);
+  box-shadow:0 18px 38px -18px rgba(0,212,255,.7), inset 0 1px 0 rgba(143,199,232,.12);
 }
 a.social:hover::before,a.social:focus-visible::before{opacity:1}
 a.social:hover::after,a.social:focus-visible::after{animation:social-ping .85s var(--ease-out) 1}
@@ -429,9 +470,9 @@ a.social:hover::after,a.social:focus-visible::after{animation:social-ping .85s v
 a.social:active{transform:translateY(-1px) scale(.96)}
 @keyframes social-ping{
   0%{opacity:.85; transform:scale(1)}
-  100%{opacity:0; transform:scale(1.4)}
+  100%{opacity:0; transform:scale(1.28)}
 }
-a.social svg{width:21px; height:21px; display:block}
+a.social svg{width:24px; height:24px; display:block}
 /* Signature visuelle : le cadre du logo se retrace, comme une liaison qui
    s'établit. Le glyphe, lui, ne bouge pas — un seul mouvement porteur de
    sens par pastille, le reste n'est que couleur et lumière. */
@@ -760,7 +801,9 @@ body.open #close{
   #modal,#modal .sheetbox,#sheet{transition-duration:.15s !important}
   #close:hover{transform:none}
   #enter:hover,.block.in:hover{transform:none}
-  /* Les pastilles de contact gardent le changement de couleur, pas le mouvement */
+  /* Les cartes de contact gardent le changement de couleur, pas le mouvement :
+     le flottement orbital s'arrête net, les cartes reprennent leur place. */
+  .socials .orb{animation:none !important; transform:none !important}
   a.social{transition-duration:.15s !important}
   a.social:hover,a.social:focus-visible,a.social:active{transform:none}
   a.social:hover::after,a.social:focus-visible::after{animation:none}
@@ -883,11 +926,12 @@ var SOCIAUX = [
    pour les lecteurs d'écran et dans « title » pour l'infobulle native. */
 function socialsHTML() {
   return '<span class="socials">' + SOCIAUX.map(function (s) {
-    return '<a class="social" href="' + s.href + '"' +
+    return '<span class="orb">' +
+           '<a class="social" href="' + s.href + '"' +
            (s.externe ? ' target="_blank" rel="noopener noreferrer"' : '') +
            ' aria-label="' + s.label + '" title="' + s.nom + '">' +
            '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + s.svg + '</svg>' +
-           '</a>';
+           '</a></span>';
   }).join('') + '</span>';
 }
 
