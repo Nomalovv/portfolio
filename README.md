@@ -11,6 +11,12 @@ Double-cliquez sur `index.html` : il s'ouvre directement dans le navigateur en
 au chargement pour récupérer three.js (CDN cdnjs) et les polices Google Fonts ; la
 carte du monde, elle, est générée dans la page et ne déclenche aucune requête.
 
+Le site est réparti en plusieurs fichiers, mais tous sont chargés en chemins
+relatifs par de simples `<link>` et `<script src>` — ce qui fonctionne en
+`file://` contrairement aux modules ES et à `fetch()`. **Gardez donc les dossiers
+`css/` et `js/` à côté de `index.html`** : c'est le trio qu'il faut copier ou
+envoyer, pas le seul fichier HTML.
+
 Navigation : la barre de nœuds en bas d'écran liste les sept rubriques et est
 visible dès le premier écran — un clic ouvre la rubrique et amène le globe
 dessus, sans rien avoir à faire défiler ni faire tourner. `Tab` parcourt ces
@@ -22,11 +28,30 @@ Pour ceux qui préfèrent explorer : le bouton « Explorer le globe » (ou la
 molette, ou un balayage vertical) bascule en vue globe, le glisser l'oriente
 librement et un clic direct sur un nœud ouvre sa rubrique.
 
+## Plan des fichiers
+
+```
+index.html        squelette : en-tête, balisage, appels des feuilles et scripts
+css/style.css     toute la mise en forme (palette, composants, requêtes média)
+js/data.js        contenu des rubriques, liens, repli texte sans 3D
+js/worldmap.js    contours des continents, carte procédurale, textures
+js/globe.js       scène three.js : globe, nœuds, arcs, impulsions, état
+js/ui.js          barre de nœuds, cartes en orbite, satellites, modale, mobile
+js/main.js        amorçage, molette / glisser / clavier / tactile, boucle de rendu
+```
+
+Les scripts se chargent dans cet ordre et en dépendent : `js/main.js` vérifie
+three.js, appelle `initGlobe()` puis `initUI()`, branche les entrées et lance la
+boucle de rendu. Si three.js ne se charge pas ou si WebGL est indisponible,
+`renderFallbackDoc()` (dans `js/data.js`) affiche l'intégralité du contenu en
+texte.
+
 ## Modifier le contenu
 
-Tout est dans `index.html`. Quatre endroits à connaître.
+Quatre endroits à connaître : deux dans `js/data.js`, un dans `index.html`, un
+dans `css/style.css`.
 
-### 1. Le texte des rubriques — `var RUBRIQUES`
+### 1. Le texte des rubriques — `var RUBRIQUES` dans `js/data.js`
 
 Cherchez `var RUBRIQUES = [` (section « 1. DONNÉES DE CONTENU »). C'est le seul
 endroit à toucher pour changer les textes. Une rubrique = un objet :
@@ -48,7 +73,7 @@ endroit à toucher pour changer les textes. Une rubrique = un objet :
 `lat` / `lon` déplacent le nœud sur le globe. Comptez 3 ou 4 blocs par rubrique :
 au-delà, le placement anti-chevauchement manque de place sur petit écran.
 
-### 2. Les liens LinkedIn / GitHub / courriel — `var SOCIAUX`
+### 2. Les liens LinkedIn / GitHub / courriel — `var SOCIAUX` dans `js/data.js`
 
 Juste au-dessus de `RUBRIQUES` (section « 1.a »). Une entrée = un lien, avec son
 glyphe SVG écrit sur place (aucune bibliothèque d'icônes) : changez `href` pour
@@ -61,23 +86,27 @@ autre — il n'y a rien d'autre à toucher. Sur mobile et dans la version texte,
 où il n'y a pas d'espace libre autour du nœud, ils reviennent en rangée au bas
 de la rubrique.
 
-### 3. L'écran d'accueil — le bloc `<section id="intro">`
+### 3. L'écran d'accueil — le bloc `<section id="intro">` d'`index.html`
 
 Dans le HTML, juste après `<body>` : ligne de coordonnées, nom, métier et accroche.
 Le nom du bandeau en haut à gauche se change dans `<header id="brand">`.
 
-### 4. Les couleurs — le bloc `:root` du `<style>`
+### 4. Les couleurs — le bloc `:root` de `css/style.css`
 
 Toute la palette est en variables CSS (`--bg-deep`, `--accent`, `--warm`, `--text`…)
 tout en haut de la feuille de style. Les couleurs 3D correspondantes (points de
-terre, arcs, nœuds) sont regroupées juste en dessous dans l'objet `var COL` du
-script — modifiez les deux ensemble pour rester cohérent.
+terre, arcs, nœuds) sont dans l'objet `COL`, en haut de `js/globe.js` (il est
+rempli au démarrage, `THREE.Color` ayant besoin de la bibliothèque) — modifiez
+les deux ensemble pour rester cohérent.
 
 ## Bon à savoir
 
-- Les nœuds décoratifs secondaires se règlent dans `var SECONDAIRES` (nom, lat, lon).
-- La densité du globe se règle avec `var STEP = 1.0;` dans `buildDots()` : augmenter
-  la valeur réduit le nombre de points (donc la charge GPU), la diminuer l'augmente.
+- Les nœuds décoratifs secondaires se règlent dans `var SECONDAIRES` (nom, lat, lon),
+  dans `js/data.js`.
+- La densité du globe se règle avec `var STEP = 1.0;` dans `buildDots()`
+  (`js/globe.js`) : augmenter la valeur réduit le nombre de points (donc la charge
+  GPU), la diminuer l'augmente. C'est le premier réglage à toucher sur une machine
+  peu puissante.
 - Si three.js ne se charge pas ou si WebGL est indisponible, la page bascule sur
   une version texte complète de toutes les rubriques au lieu d'un écran vide.
 - Le libellé des entrées de la barre de nœuds vient de `RUBRIQUES` : changer un

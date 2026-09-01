@@ -4,15 +4,22 @@ Ce fichier documente les choix techniques et les décisions prises pendant la co
 
 Il se lit dans les deux sens : les sections « Passe … » racontent **pourquoi**
 les choses sont ce qu'elles sont, dans l'ordre où elles ont été décidées ; la
-section **« Où en est le fichier »**, plus bas, décrit l'**état courant** —
-plan du fichier, modèle de données, invariants, façon de rejouer les tests.
+section **« Où en est le projet »**, plus bas, décrit l'**état courant** —
+plan des fichiers, modèle de données, invariants, façon de rejouer les tests.
 Avant une modification d'ampleur, commencer par celle-là, et la corriger en
 même temps que le code.
 
-## Fichier livré
+## Fichiers livrés
 
-- `index.html` — page unique autonome (~120 Ko), HTML/CSS/JS inline, Three.js r128 chargé en script classique depuis cdnjs (pas de modules ES) pour que le fichier fonctionne aussi en ouverture directe `file://`.
+- `index.html` — squelette : en-tête, balisage, appels des feuilles et des scripts.
+- `css/style.css` — toute la mise en forme.
+- `js/data.js`, `js/worldmap.js`, `js/globe.js`, `js/ui.js`, `js/main.js` — le
+  script, découpé (voir « Où en est le projet » plus bas).
 - `README.md` — instructions d'ouverture et points de personnalisation rapides.
+
+Three.js r128 est chargé en script classique depuis cdnjs, et les fichiers du
+dépôt le sont en chemins relatifs : **pas de module ES, pas de `fetch()`**, pour
+que le site s'ouvre en double-cliquant sur `index.html` en `file://`.
 
 ## Carte du monde du globe pointillé
 
@@ -295,7 +302,104 @@ satisfaite par la position **héritée** de la rubrique précédente — toutes
 finissent centrées : il faut attendre deux images réelles avant de mesurer,
 sinon on lit un calque que la boucle de rendu n'a pas encore placé.
 
-## Où en est le fichier — repères avant une grosse modification
+## Passe « découpage en fichiers » — un index.html léger, du code cacheable
+
+### La demande et la contrainte qui la borne
+
+Le propriétaire trouvait que la page demandait trop au navigateur, en
+particulier sur un PC modeste : tout tenait dans un `index.html` de 120 Ko,
+2 720 lignes, HTML + CSS + JS inline. Demande : découper en fichiers et
+sous-dossiers.
+
+La contrainte qui décide de **comment** découper est la promesse du README :
+« double-cliquez sur `index.html` ». En `file://`, Chrome et Edge refusent les
+modules ES (`type="module"`, `import`) et `fetch()`/XHR vers des fichiers
+locaux — chaque origine `file://` est opaque. Sont en revanche parfaitement
+servis : `<link rel="stylesheet">` et `<script src>` classiques en chemins
+relatifs. Le découpage est donc fait avec ces deux briques-là, et **rien
+d'autre** : cinq scripts classiques chargés dans l'ordre, une feuille de style,
+la portée globale comme seul mécanisme de partage.
+
+C'est le point à ne pas « moderniser » plus tard : passer ces cinq fichiers en
+modules ES casserait l'ouverture par double-clic, qui est une fonctionnalité du
+site, pas un détail d'outillage.
+
+### Ce que ça change vraiment
+
+Il faut être honnête sur le gain : pour un premier chargement, la quantité
+d'octets est la même, à ~3 Ko près. Ce que le découpage apporte :
+
+- la feuille de style est analysée pendant que les scripts se téléchargent, au
+  lieu d'être lue au milieu du HTML ;
+- chaque fichier est mis en cache séparément : retoucher un texte de `data.js`
+  ne réinvalide plus les 120 Ko ;
+- le fichier qu'on ouvre pour travailler fait 75 lignes au lieu de 2 720.
+
+Le vrai coût à l'affichage reste le globe : 12 498 points et 47 arcs à chaque
+image. Le réglage qui pèse là-dessus est `var STEP` dans `buildDots()`
+(`js/globe.js`) — l'augmenter réduit le nombre de points. Il n'a pas été touché
+ici : la demande portait sur l'organisation des fichiers.
+
+### La seule vraie difficulté : deux `return` au milieu de la page
+
+Tout le script vivait dans une seule fonction `bootPortfolio()`, avec deux
+sorties anticipées — three.js absent, puis WebGL indisponible — et un
+`try/catch` autour. Un corps de fonction ne se coupe pas en cinq fichiers, et
+un `return` ne se place pas au premier niveau d'un script.
+
+Le partage se fait donc par la **portée globale**, et l'ordonnancement par une
+suite d'appels dans `bootPortfolio()`, réduite à cela. Les deux sorties
+deviennent : le garde-fou three.js dans `bootPortfolio()`, et `initGlobe()` qui
+rend `false` après avoir affiché le repli texte. Corollaire indispensable :
+plus rien qui touche à `THREE` ne s'exécute au premier niveau d'un fichier —
+`COL`, les quatre textures et les vecteurs de travail sont désormais construits
+dans `initGlobe()`. Sans cela, le chargement du script échouerait avant même le
+garde-fou quand le CDN est injoignable, et le repli texte — la raison d'être du
+garde-fou — ne s'afficherait jamais.
+
+Le code lui-même n'a pas été réécrit : les fonctions ont été déplacées telles
+quelles par un script de découpage, à quelques `var` près, hissés au niveau du
+fichier. Ce qui a permis de comparer les deux versions ligne à ligne, et
+surtout de rejouer la batterie de tests à l'identique.
+
+### Vérifications de cette passe
+
+Navigateur headless (Edge Chromium piloté par puppeteer-core, WebGL logiciel),
+**en `file://` et sans `--allow-file-access-from-files`** : sans ce drapeau, un
+chargement qui ne passerait pas chez le propriétaire échouerait aussi ici.
+
+- **Chargement** : les sept ressources `file://` répondent 200, aucune requête
+  en échec, aucune erreur console. Palette CSS appliquée, 7 rubriques, 3 liens,
+  20 nœuds secondaires, 12 498 points en **un seul** `THREE.Points`, 21 arcs
+  principaux, 7 nœuds / 7 pancartes / 7 repères câblés (13 vérifications).
+- **Non-régression complète** : la batterie de la passe précédente rejouée sans
+  modification — 1920×1080 à 821×640, satellites, cartes, barre, clavier,
+  survol, mobile 375×780, `prefers-reduced-motion`, repli sans three.js :
+  **521 vérifications passées, aucune erreur console**, exactement le même
+  résultat qu'avant découpage.
+- **Complément** : les 7 rubriques ouvertes une à une sur 7 tailles (1440×900,
+  1366×768, 1280×800, 1152×720, 1024×700, 1024×640, 900×640) — cartes dans
+  l'écran, sans contact entre elles ni avec la barre —, `Tab` sur les sept
+  entrées, `Entrée`, `Échap` à deux niveaux, et le **repli sans WebGL** —
+  chemin nouvellement écrit (`initGlobe()` → `false`), vérifié en neutralisant
+  `getContext('webgl')` : 7 sections, 25 fiches, 3 liens, barre masquée, page
+  rendue au défilement du navigateur. **649 vérifications passées, aucune
+  erreur console.**
+
+Soit **1 183 vérifications** au total sur cette passe.
+
+Piège de méthode rencontré, à ajouter aux précédents : la condition d'arrivée du
+nœud au centre était vérifiée **en x seulement**. Les cartes étant placées autour
+de `(W/2, H/2)`, un nœud arrivé horizontalement mais encore à 200 px trop bas
+donne des cartes ancrées trop bas, que la boucle de rendu ramène de force dans
+l'écran — et deux cartes d'une même pile finissent par se toucher. En rendu
+logiciel (quelques images par seconde, interpolation à 0,10 par image) cela dure
+plusieurs secondes. Le harnais attend maintenant que la condition tienne **en x
+et en y sur huit images consécutives**. Les « chevauchements » observés avant
+cette correction se reproduisaient à l'identique sur la version d'avant
+découpage : c'étaient bien des mesures prises trop tôt, pas une régression.
+
+## Où en est le projet — repères avant une grosse modification
 
 Section tenue à jour volontairement : elle décrit l'**état courant**, pas
 l'histoire (les passes ci-dessus racontent le pourquoi). À relire en premier
@@ -303,18 +407,29 @@ avant de toucher quoi que ce soit, et à corriger en même temps que le code.
 
 ### Chiffres
 
-- `index.html` — un seul fichier autonome, ~120 Ko, ~2 720 lignes : HTML, CSS
-  et JS inline, three.js r128 chargé depuis cdnjs en script classique.
-- 7 rubriques, 25 fiches de contenu, 20 nœuds décoratifs, 21 arcs principaux.
-- 33 fonctions au premier niveau du script, toutes dans `bootPortfolio()`.
+- 7 fichiers, ~125 Ko au total, three.js r128 chargé depuis cdnjs en script
+  classique :
+
+  ```
+  index.html         75 lignes    squelette + appels des feuilles et scripts
+  css/style.css     820 lignes    toute la mise en forme
+  js/data.js        225 lignes    RUBRIQUES, SOCIAUX, SECONDAIRES, repli texte
+  js/worldmap.js    220 lignes    contours, carte procédurale, textures
+  js/globe.js       488 lignes    scène three.js, nœuds, arcs, état
+  js/ui.js          507 lignes    barre, cartes, satellites, modale, mobile
+  js/main.js        469 lignes    amorçage, entrées, boucle de rendu
+  ```
+
+- 7 rubriques, 25 fiches de contenu, 20 nœuds décoratifs, 21 arcs principaux,
+  12 498 points de terre.
 - Contenu : les **25 fiches portent « Texte à compléter. »**. Aucune n'a de
   lecture longue (`long`) pour l'instant, donc aucun bouton « Voir en détail »
   n'apparaît — la modale et son piège à focus existent et fonctionnent, elles
   n'ont simplement rien à afficher tant qu'aucune fiche n'a de `long`.
 
-### Plan du fichier
+### Plan de la feuille de style
 
-Feuille de style, dans l'ordre : `PALETTE + BASES` · `ÉCRAN D'ACCUEIL` ·
+`css/style.css`, dans l'ordre : `PALETTE + BASES` · `ÉCRAN D'ACCUEIL` ·
 `INDICATEURS EN MODE GLOBE` · `BARRE DE NŒUDS` · `CONTENU EN ORBITE` ·
 `SATELLITES DE LIENS` · `MODALE DE LECTURE LONGUE` · `FEUILLE MOBILE` ·
 `ERREUR / DIVERS`, puis la requête `max-width:820px` (portrait) et la requête
@@ -322,19 +437,46 @@ Feuille de style, dans l'ordre : `PALETTE + BASES` · `ÉCRAN D'ACCUEIL` ·
 le rester : plusieurs de leurs règles n'ont pas de `!important` et gagnent par
 l'ordre de cascade.
 
-Script, dans l'ordre : `1. DONNÉES DE CONTENU` (dont `1.a` les satellites de
-liens) · `1bis. REPLI SANS 3D` · `1ter. GARDE-FOU three.js` · `2. CARTE DU MONDE
-PROCÉDURALE` · `3. TEXTURES GÉNÉRÉES` · `4. SCÈNE` · `5. NŒUDS ET ARCS` ·
-`6. ÉTAT D'INTERACTION` · `7. ROTATION VERS UN POINT` · `8. INTERFACE` (orbite,
-anti-chevauchement, modale, feuille mobile) · `9. PROJECTION 3D → 2D` ·
-`10. BOUCLE DE RENDU`.
+### Plan du script
 
-Cet ordre porte deux contraintes réelles : `RUBRIQUES` et `renderFallbackDoc()`
-sont déclarés **avant** le garde-fou three.js (sans WebGL, le contenu doit
-rester lisible), et tout le code d'initialisation est enveloppé dans un
-`try/catch` pour que le repli fonctionne vraiment quand quelque chose casse.
+Les cinq fichiers de `js/` sont des **scripts classiques**, chargés dans l'ordre
+en bas d'`index.html`. Pas de module ES, pas de `fetch()` : les deux sont
+bloqués en `file://`, et la promesse « double-clic, aucun serveur » du README en
+dépend. Ils partagent donc la portée globale, et l'ordre des balises est l'ordre
+des dépendances :
+
+1. **`js/data.js`** — `SOCIAUX` + `socialsHTML()`, `RUBRIQUES`, `SECONDAIRES`,
+   `fmtCoordsOf()`, `renderFallbackDoc()`, plus `REDUCED` et `isMobile()`.
+   Rien ici ne dépend de three.js : c'est **la** contrainte d'ordre, sans WebGL
+   le contenu doit rester lisible.
+2. **`js/worldmap.js`** — `LAND`, `SEAS`, `buildWorldMap()`, `latLonToVec3()`,
+   les trois fabriques de textures et `buildTextures()`.
+3. **`js/globe.js`** — l'objet `COL`, les objets de scène partagés, l'objet
+   `state`, `initGlobe()` (renderer, globe, points, halo, bokeh, nœuds, arcs,
+   impulsions), `aimAt()`, `projectNode()`.
+4. **`js/ui.js`** — les références du document, `initUI()` (repères, barre de
+   nœuds, pancartes, modale, croix), `announce()`, `syncDock()`, la modale,
+   `layoutBlocks()` / `layoutSats()`, `openRubrique()` / `closeRubrique()`,
+   `buildSheet()`.
+5. **`js/main.js`** — `pickNode()`, `handleTap()`, `resize()`, `setHint()`,
+   `frame()`, `initInteractions()` (molette, glisser, clavier, tactile) et
+   `bootPortfolio()`, enveloppé dans le `try/catch` qui garantit qu'aucune
+   erreur d'initialisation ne laisse un écran vide.
+
+`bootPortfolio()` est le seul ordonnanceur : garde-fou three.js → `initGlobe()`
+(qui rend `false` et affiche le repli texte si WebGL manque) → `initUI()` →
+`initInteractions()` → `resize()` → `frame()`. **`initUI()` doit rester après
+`initGlobe()`** : les pancartes se rangent dans les nœuds de la scène
+(`nodes[i].tag`).
+
+Tout ce qui a besoin de `THREE` est construit **dans** `initGlobe()` — `COL`,
+les textures, les vecteurs de travail — jamais au premier niveau d'un fichier :
+sinon le simple chargement du script planterait quand le CDN est injoignable, et
+le repli texte ne s'afficherait pas.
 
 ### Modèle de données
+
+Tout est dans `js/data.js`.
 
 ```
 RUBRIQUES[] = { id, nom, ville, lat, lon, sats?, blocs[] }
@@ -378,6 +520,13 @@ deux autres sont ceux qu'on oublie.
 - **Aucune ressource externe hors CDN** : la carte du monde est générée sur un
   canvas, pas chargée — pas de `fetch`, pas d'image, donc pas de canvas *tainted*
   en `file://`.
+- **Le site s'ouvre en double-cliquant sur `index.html`.** Donc : **pas de module
+  ES, pas de `fetch()`/XHR vers un fichier du dépôt**, jamais — les deux sont
+  bloqués en `file://`. Les fichiers de `css/` et `js/` sont chargés par
+  `<link>` et `<script src>` classiques, en chemins relatifs, dans l'ordre de
+  leurs dépendances. C'est la contrainte qui a dicté tout le découpage.
+- **Rien qui touche à `THREE` au premier niveau d'un fichier** : tout passe par
+  `initGlobe()`, sinon le repli texte ne s'affiche plus quand le CDN tombe.
 - **`z-index`** : pancartes 4 < contenu en orbite et satellites 5 < feuille
   mobile 8 < modale. Les pancartes sont passées sous les cartes pour une raison
   (elles transparaissaient au travers), la croix de fermeture passe sous le voile
@@ -409,6 +558,11 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
 - Edge Chromium en `headless:'new'`, lancé avec `--use-gl=angle
   --use-angle=swiftshader --enable-unsafe-swiftshader` : le rendu WebGL logiciel
   suffit, mais il tourne à quelques images par seconde.
+- **Ouvrir la page en `file://`, et sans `--allow-file-access-from-files`.**
+  Le drapeau masquerait exactement ce qu'on veut vérifier : que les fichiers de
+  `css/` et `js/` se chargent bien dans les conditions du double-clic.
+- **Attendre la position en x ET en y** du nœud actif (voir le piège décrit dans
+  la passe « découpage en fichiers »), sur plusieurs images consécutives.
 - **Redimensionner à chaud plutôt que recharger** : une dizaine de contextes
   WebGL logiciels d'affilée finissent par faire tomber le rendu (« Navigating
   frame was detached »). C'est de toute façon le cas réel à couvrir.
@@ -433,6 +587,8 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
 
 ## Limites connues / à savoir
 
+- Le site est en plusieurs fichiers : `index.html` a besoin des dossiers `css/`
+  et `js/` **à côté de lui**. Envoyer le seul `index.html` ne suffit plus.
 - Le CDN Three.js et Google Fonts nécessitent une connexion réseau au premier chargement (la carte du monde, elle, est entièrement inline). Un message s'affiche si le réseau est indisponible.
 - Les tracés côtiers sont volontairement simplifiés (~40 à 70 sommets par continent) : lisibles à l'échelle du globe, approximatifs si on zoomait fortement.
 - Les trois destinations de `SOCIAUX` sont réelles : adresse courriel de l'utilisateur (gardée volontairement, décision explicite), profil LinkedIn et compte GitHub `Nomalovv`. Elles flottent autour de la rubrique **Contact**, hors de toute carte.
