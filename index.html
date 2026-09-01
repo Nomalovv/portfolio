@@ -382,6 +382,77 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .block a{color:var(--accent-soft); text-decoration:none; border-bottom:1px solid rgba(0,212,255,.38)}
 .block a:hover{border-bottom-color:rgba(0,212,255,.9); color:#d5faff}
 
+/* ============================================================
+   RANGÉE DE LIENS — rubrique Contact
+   Structure volontairement générique : une pastille = un <a class="social">
+   contenant un SVG inline (cadre tracé + glyphe). Ajouter une icône
+   (courriel, dépôt…) ne demande qu'une entrée de plus dans SOCIAUX,
+   côté script — rien à toucher ici.
+   Les sélecteurs portent sur « a.social » et non « .social » pour repasser
+   devant les liens texte de .block / #sheet, qui sont soulignés.
+   ============================================================ */
+.socials{display:flex; flex-wrap:wrap; gap:10px; padding-top:2px}
+a.social{
+  position:relative;
+  display:inline-flex; align-items:center; justify-content:center;
+  flex:none; width:44px; height:44px;   /* cible tactile 44 px, écart 10 px */
+  border:1px solid rgba(0,212,255,.32); border-radius:12px;
+  background:rgba(0,212,255,.05);
+  color:var(--text-dim); text-decoration:none;
+  transition:color .3s var(--ease), border-color .3s var(--ease),
+             background-color .3s var(--ease), transform .45s var(--ease-out),
+             box-shadow .35s var(--ease);
+}
+/* Halo : le même vocabulaire lumineux que les points du globe */
+a.social::before{
+  content:""; position:absolute; inset:-1px; border-radius:inherit; pointer-events:none;
+  background:radial-gradient(62% 62% at 50% 38%, rgba(0,212,255,.32), transparent 72%);
+  opacity:0; transition:opacity .35s var(--ease);
+}
+/* Onde de connexion : UN seul ping, émis à la prise de survol/focus.
+   Une boucle infinie serait de la décoration ; ici l'onde signifie le
+   contact établi, exactement comme les arcs entre les nœuds du globe. */
+a.social::after{
+  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  border:1px solid var(--accent); opacity:0;
+}
+a.social:hover,a.social:focus-visible{
+  color:var(--accent-soft);
+  border-color:var(--glass-brd-hi);
+  background:rgba(0,212,255,.13);
+  transform:translateY(-3px);
+  box-shadow:0 12px 28px -14px rgba(0,212,255,.75);
+}
+a.social:hover::before,a.social:focus-visible::before{opacity:1}
+a.social:hover::after,a.social:focus-visible::after{animation:social-ping .85s var(--ease-out) 1}
+/* Retour d'appui : léger enfoncement, dans la plage 0,95–1,05 recommandée */
+a.social:active{transform:translateY(-1px) scale(.96)}
+@keyframes social-ping{
+  0%{opacity:.85; transform:scale(1)}
+  100%{opacity:0; transform:scale(1.4)}
+}
+a.social svg{width:21px; height:21px; display:block}
+/* Signature visuelle : le cadre du logo se retrace, comme une liaison qui
+   s'établit. Le glyphe, lui, ne bouge pas — un seul mouvement porteur de
+   sens par pastille, le reste n'est que couleur et lumière. */
+a.social .frame{
+  fill:none; stroke:currentColor; stroke-width:1.4;
+  stroke-dasharray:96; stroke-dashoffset:0;
+  opacity:.5; transition:opacity .3s var(--ease);
+}
+a.social:hover .frame,a.social:focus-visible .frame{opacity:1; animation:social-trace .9s var(--ease-out) 1}
+@keyframes social-trace{from{stroke-dashoffset:96} to{stroke-dashoffset:0}}
+a.social .glyph{fill:currentColor}
+/* Pas d'étiquette dessinée : les pastilles sont muettes, le glyphe porte tout.
+   La destination reste annoncée par « aria-label » aux lecteurs d'écran, et
+   « title » fournit l'infobulle native du navigateur au survol prolongé. */
+/* Contextes où un « a » est stylé par un sélecteur d'identifiant */
+#sheet a.social,#fatal.doc a.social{color:var(--text-dim); border-bottom-color:var(--glass-brd)}
+#sheet a.social:hover,#sheet a.social:focus-visible,
+#fatal.doc a.social:hover,#fatal.doc a.social:focus-visible{
+  color:var(--accent-soft); border-bottom-color:var(--glass-brd-hi);
+}
+
 /* Écran bas (portable 1366×768, 1024×640…). Deux cartes empilées de 250 px
    plus la barre de nœuds ne tiennent plus dans la hauteur utile : le placement
    resserrait alors la gouttière jusqu'à 4 px, puis la boucle de rendu ramenait
@@ -689,6 +760,11 @@ body.open #close{
   #modal,#modal .sheetbox,#sheet{transition-duration:.15s !important}
   #close:hover{transform:none}
   #enter:hover,.block.in:hover{transform:none}
+  /* Les pastilles de contact gardent le changement de couleur, pas le mouvement */
+  a.social{transition-duration:.15s !important}
+  a.social:hover,a.social:focus-visible,a.social:active{transform:none}
+  a.social:hover::after,a.social:focus-visible::after{animation:none}
+  a.social:hover .frame,a.social:focus-visible .frame{animation:none; opacity:1}
 }
 </style>
 </head>
@@ -759,210 +835,128 @@ var isMobile = function () { return window.innerWidth <= 820; };
    Déclarées AVANT le garde-fou three.js : sans WebGL le globe disparaît, mais
    le contenu, lui, doit rester lisible (voir renderFallbackDoc plus bas).
    ========================================================================== */
+/* --- 1.a Pastilles de liens (rubrique Contact) -----------------------------
+   Une entrée = une pastille dans la rangée. Les glyphes sont des SVG écrits
+   ici même : aucune dépendance à une bibliothèque d'icônes externe.
+   Chaque SVG se compose de deux parties, et c'est ce que la feuille de style
+   anime : « frame » (le cadre, retracé au survol) et « glyph » (le symbole).
+   Ajouter une destination = ajouter une entrée ici, rien d'autre.
+   « externe » ouvre le lien dans un nouvel onglet ; le courriel s'en passe,
+   un mailto n'a pas à laisser une page blanche derrière lui. */
+var SOCIAUX = [
+  {
+    id: 'linkedin',
+    nom: 'LinkedIn',
+    href: 'https://www.linkedin.com/in/arthur-formentin-907296362/',
+    label: 'Profil LinkedIn d’Arthur Formentin (nouvel onglet)',
+    externe: true,
+    svg: '<rect class="frame" x="1.7" y="1.7" width="20.6" height="20.6" rx="4.6"/>' +
+         '<g class="glyph">' +
+         '<circle cx="7.1" cy="7.6" r="1.55"/>' +
+         '<rect x="5.85" y="10" width="2.5" height="8.15" rx=".4"/>' +
+         '<path d="M10.9 18.15V10h2.4v1.12h.04c.43-.78 1.37-1.37 2.67-1.37 2.28 0 2.99 1.4 2.99 3.56v4.84h-2.5v-4.34c0-1.06-.02-2.43-1.5-2.43-1.5 0-1.74 1.15-1.74 2.35v4.42z"/>' +
+         '</g>'
+  },
+  {
+    id: 'github',
+    nom: 'GitHub',
+    href: 'https://github.com/Nomalovv',
+    label: 'Profil GitHub d’Arthur Formentin (nouvel onglet)',
+    externe: true,
+    svg: '<circle class="frame" cx="12" cy="12" r="10.3"/>' +
+         '<path class="glyph" d="M12 5.1a7 7 0 00-2.21 13.64c.35.06.48-.15.48-.34v-1.2c-1.95.42-2.36-.94-2.36-.94-.32-.81-.78-1.03-.78-1.03-.64-.44.05-.43.05-.43.7.05 1.07.73 1.07.73.63 1.07 1.65.76 2.05.58.06-.46.25-.77.45-.94-1.56-.18-3.2-.78-3.2-3.47 0-.77.28-1.4.73-1.89-.07-.18-.32-.9.07-1.87 0 0 .6-.19 1.96.72a6.8 6.8 0 013.56 0c1.36-.91 1.95-.72 1.95-.72.4.97.15 1.69.08 1.87.46.49.73 1.12.73 1.89 0 2.7-1.65 3.29-3.22 3.46.26.22.48.65.48 1.31v1.94c0 .19.13.41.49.34A7 7 0 0012 5.1z"/>'
+  },
+  {
+    id: 'mail',
+    nom: 'Courriel',
+    href: 'mailto:arthur.formentin@sts-sio-caen.info',
+    label: 'Écrire à arthur.formentin@sts-sio-caen.info',
+    svg: '<rect class="frame" x="1.9" y="5" width="20.2" height="14" rx="3.2"/>' +
+         '<path class="glyph" d="M3.6 7.1l8.4 5.7 8.4-5.7v2.1L12 15 3.6 9.2z"/>'
+  }
+];
+
+/* Rend la rangée. Le résultat est injecté tel quel dans le champ « d » d'un
+   bloc marqué « html:true » — donc identique sur le globe, sur la feuille
+   mobile et dans le repli texte sans WebGL.
+   Les pastilles n'affichent aucun texte : le nom part dans « aria-label »
+   pour les lecteurs d'écran et dans « title » pour l'infobulle native. */
+function socialsHTML() {
+  return '<span class="socials">' + SOCIAUX.map(function (s) {
+    return '<a class="social" href="' + s.href + '"' +
+           (s.externe ? ' target="_blank" rel="noopener noreferrer"' : '') +
+           ' aria-label="' + s.label + '" title="' + s.nom + '">' +
+           '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' + s.svg + '</svg>' +
+           '</a>';
+  }).join('') + '</span>';
+}
+
 var RUBRIQUES = [
   {
     id: 'apropos', nom: 'À propos', ville: 'Paris', lat: 48.85, lon: 2.35,
     blocs: [
-      { t:'Approche du métier',
-        p:"La sécurité n'est pas une couche posée à la fin. Je conçois les réseaux en partant du principe que la compromission finira par arriver.",
-        d:'PRINCIPE : MOINDRE PRIVILÈGE · DÉFENSE EN PROFONDEUR',
-        long:["Un pare-feu périmétrique bien configuré ne dit rien de ce qui se passe une fois qu'un poste bureautique est compromis. C'est ce constat qui oriente tout mon travail : je pars du principe qu'un attaquant sera un jour à l'intérieur, et je conçois l'infrastructure pour que ça ne suffise pas.",
-               "Concrètement, cela veut dire trois choses. Segmenter, pour qu'un poste compromis ne voie qu'une fraction du réseau. Appliquer le moindre privilège aux comptes comme aux flux, parce qu'un droit qui n'existe pas ne peut pas être détourné. Et journaliser suffisamment pour être capable de raconter ce qui s'est passé, après coup, avec des preuves.",
-               "Je travaille aussi beaucoup la documentation. Une architecture que personne ne comprend six mois plus tard est une architecture qui va dériver, et une architecture qui dérive redevient vulnérable."] },
-      { t:'Terrain d\'intervention',
-        p:"Parcs de 50 à 800 postes : PME industrielles, collectivités, sites multiples reliés en VPN avec de fortes contraintes de continuité.",
-        d:'50 → 800 POSTES · MULTI-SITES',
-        long:["Je n'interviens pas sur des environnements de très grande taille avec des équipes spécialisées par domaine. Mon terrain, ce sont les structures où l'on est deux ou trois à tout tenir : l'annuaire, les hyperviseurs, les pare-feux, la sauvegarde et le support.",
-               "Ce contexte impose des choix. Les solutions doivent être maintenables par une petite équipe, documentées, et reposer sur des briques dont on maîtrise vraiment le fonctionnement plutôt que sur des boîtes noires.",
-               "Les contraintes de continuité y sont souvent plus fortes qu'ailleurs : une ligne de production à l'arrêt coûte immédiatement, ce qui interdit les fenêtres de maintenance longues et impose de tester les changements dans un laboratoire fidèle avant de les appliquer."] },
-      { t:'Méthode de travail',
-        p:"Cartographier, segmenter, journaliser, puis durcir. Dans cet ordre, parce qu'on ne protège pas ce qu'on n'a pas inventorié.",
-        d:'INVENTAIRE → SEGMENTATION → JOURNALISATION → DURCISSEMENT',
-        long:["La première chose que je demande en arrivant sur un parc, c'est le plan d'adressage et la liste des flux censés exister. Dans la majorité des cas, ces documents n'existent pas ou datent de plusieurs années. Reconstruire cette carte est toujours la première étape.",
-               "Vient ensuite la segmentation : découper en VLAN cohérents avec les usages réels, et poser des règles inter-zones explicites. Le passage en mode « tout ce qui n'est pas autorisé est refusé » se fait progressivement, en observant d'abord en mode journalisation seule pour ne rien casser.",
-               "Le durcissement arrive en dernier, parce qu'il est beaucoup plus efficace sur une infrastructure dont on connaît les flux que sur un réseau plat où chaque modification risque de couper un service dont personne ne soupçonnait l'existence."] },
-      { t:'Disponibilité',
-        p:"Ouvert aux missions et à l'alternance. Mobilité Normandie et Île-de-France, télétravail partiel possible.",
-        d:'STATUT : DISPONIBLE · NORMANDIE / ÎLE-DE-FRANCE',
-        long:["Je suis actuellement disponible pour une alternance ou une mission en administration réseau et sécurité des systèmes d'information.",
-               "Je me déplace sans difficulté sur la Normandie et l'Île-de-France, et le télétravail partiel est envisageable dès lors que les interventions physiques sur les équipements restent planifiables.",
-               "Le plus simple pour échanger reste un courriel : je réponds sous vingt-quatre heures en semaine."] }
+      { t:'Approche du métier', p:"Texte à compléter." },
+      { t:'Terrain d\'intervention', p:"Texte à compléter." },
+      { t:'Méthode de travail', p:"Texte à compléter." },
+      { t:'Disponibilité', p:"Texte à compléter." }
     ]
   },
   {
     id: 'parcours', nom: 'Parcours', ville: 'Londres', lat: 51.51, lon: -0.13,
     blocs: [
-      { t:'BTS SIO — option SISR',
-        p:"Solutions d'infrastructure, systèmes et réseaux. Virtualisation, annuaire, supervision et sécurisation des accès.",
-        d:'2024 — 2026 · STS CAEN',
-        long:["Le BTS Services informatiques aux organisations, option Solutions d'infrastructure, systèmes et réseaux, couvre l'administration des systèmes Windows et Linux, la virtualisation, le réseau et la sécurisation des accès.",
-               "Les projets menés en formation portent sur la mise en place d'une infrastructure complète : domaine Active Directory, hyperviseurs, sauvegarde, supervision et filtrage réseau, avec la documentation associée.",
-               "J'ai complété ce socle par un travail personnel régulier sur les aspects offensifs, qui sont peu couverts par le référentiel mais indispensables pour comprendre ce que l'on défend."] },
-      { t:'Alternance — infrastructure',
-        p:"Exploitation d'un parc multi-sites : Active Directory, sauvegardes, refonte complète du plan d'adressage.",
-        d:'2025 — 2026 · ALTERNANCE',
-        long:["En alternance, j'ai pris en charge l'exploitation quotidienne d'un parc réparti sur plusieurs sites : gestion de l'annuaire Active Directory, des stratégies de groupe, du plan de sauvegarde et de la supervision.",
-               "Le chantier principal a été la refonte du plan d'adressage. Le réseau historique était plat, avec un seul sous-réseau pour l'ensemble des usages. Nous l'avons redécoupé en zones fonctionnelles, en migrant site par site pour limiter l'impact.",
-               "J'ai également repris la documentation d'exploitation, jusqu'alors dispersée, pour la centraliser dans une base consultable par toute l'équipe."] },
-      { t:'Stage — support et réseau',
-        p:"Déploiement de 120 postes en masterisation, mise en place d'un inventaire et d'une base de connaissances.",
-        d:'2024 · 8 SEMAINES · 120 POSTES',
-        long:["Ce premier stage portait sur le renouvellement d'un parc de cent vingt postes de travail : préparation du master, déploiement, migration des profils et reprise des données utilisateur.",
-               "En parallèle, j'ai mis en place un inventaire matériel qui n'existait pas, ce qui a permis d'identifier une quinzaine de machines encore sous un système d'exploitation non maintenu.",
-               "J'ai clôturé la mission par la rédaction d'une base de connaissances couvrant les incidents les plus fréquents remontés au support."] },
-      { t:'Formation continue',
-        p:"Plateformes d'entraînement offensif en continu, préparation des certifications réseau et pare-feu.",
-        d:'CCNA · FORTINET NSE 4 · ROOT-ME · TRYHACKME',
-        long:["Je maintiens une pratique régulière sur les plateformes d'entraînement offensif, principalement Root-Me et TryHackMe, avec un intérêt marqué pour les parcours orientés Active Directory et élévation de privilèges en environnement Windows.",
-               "Côté certifications, je prépare le CCNA pour formaliser les acquis en routage et commutation, et la certification Fortinet NSE 4 pour la partie pare-feu, qui correspond aux équipements que je rencontre le plus souvent en entreprise.",
-               "Je tiens un dépôt public où je publie mes comptes rendus de laboratoires et les scripts d'automatisation que j'écris au fil des missions."] }
+      { t:'Formation', p:"Texte à compléter." },
+      { t:'Expérience 1', p:"Texte à compléter." },
+      { t:'Expérience 2', p:"Texte à compléter." },
+      { t:'Formation continue', p:"Texte à compléter." }
     ]
   },
   {
     id: 'certifications', nom: 'Certifications', ville: 'Reykjavik', lat: 64.15, lon: -21.94,
     blocs: [
-      { t:'CCNA — routage et commutation',
-        p:"Certification visée en premier : elle met un cadre formel sur le socle réseau que je manipule déjà tous les jours.",
-        d:'CISCO CCNA 200-301 · PASSAGE VISÉ AU PRINTEMPS 2026',
-        long:["Le CCNA est la première certification que je prépare, parce qu'elle recouvre exactement ce que je pratique : adressage, commutation, VLAN et agrégation, routage statique et OSPF, listes de contrôle d'accès, NAT et services d'infrastructure.",
-               "Ma préparation tient en trois temps. Le cours officiel Cisco pour la théorie et le vocabulaire de l'examen, un carnet de commandes annotées où je note ce qui diffère entre la version examen et ce que je rencontre réellement en production, et surtout du laboratoire : les topologies sont montées sous Packet Tracer pour les révisions rapides, puis rejouées sur des commutateurs Catalyst d'occasion pour les points où le simulateur ment.",
-               "Le rythme est d'environ six heures par semaine, réparties sur deux soirées et une plage du week-end, pour un passage visé au printemps 2026. Je m'astreins à obtenir 90 % sur trois examens blancs consécutifs avant de réserver la session : en dessous, la marge est trop mince pour un examen chronométré."] },
-      { t:'Fortinet NSE 4 — sécurité réseau',
-        p:"L'équipement que je rencontre le plus souvent en clientèle. La certification prolonge directement les chantiers de segmentation menés en alternance.",
-        d:'FORTINET NSE 4 · FORTIOS 7.4 · ENCHAÎNÉE APRÈS LE CCNA',
-        long:["Le FortiGate est le pare-feu que j'administre en alternance et celui que je retrouve dans la majorité des parcs de taille moyenne. Passer le NSE 4 revient donc à faire valider ce que je pratique déjà : politiques de sécurité, routage et interfaces virtuelles, tunnels IPsec site-à-site, inspection SSL, filtrage applicatif et journalisation.",
-               "La préparation se fait principalement sur une paire de FortiGate virtuels montés dans mon laboratoire Proxmox, avec un troisième site simulé pour tester les scénarios de bascule de tunnel. Les points qui m'ont demandé le plus de travail sont l'ordre d'évaluation des politiques et le comportement du routage par politique, deux sujets où une intuition approximative suffit en exploitation courante mais pas à l'examen.",
-               "Je vise le passage dans la foulée du CCNA, pour profiter du recouvrement entre les deux référentiels sur la partie routage plutôt que de repartir de zéro six mois plus tard."] },
-      { t:'CompTIA Security+ — socle défensif',
-        p:"Certification généraliste, utile parce qu'elle couvre la gouvernance et l'analyse de risque que la seule pratique technique ne donne pas.",
-        d:'COMPTIA SECURITY+ SY0-701 · OBJECTIF FIN 2026',
-        long:["Le Security+ n'apporte pas de compétence technique que je n'aurais pas, mais il structure une partie du métier que j'aborde autrement de façon empirique : classification des actifs, analyse de risque, cadre réglementaire, gestion de la continuité et de la conformité.",
-               "C'est aussi une certification très demandée en filtre de recrutement, et neutre vis-à-vis des constructeurs, ce qui en fait un complément cohérent d'un CCNA et d'un NSE 4 tous deux liés à un éditeur.",
-               "Je la place volontairement en dernier dans le calendrier : le référentiel est large mais peu profond, et il se révise beaucoup plus vite une fois que les deux certifications techniques sont acquises. Objectif de passage fin 2026, en fin de BTS."] },
-      { t:'Entraînement offensif continu',
-        p:"Root-Me et TryHackMe deux à trois soirs par semaine, avec un compte rendu écrit pour chaque machine résolue.",
-        d:'ROOT-ME · TRYHACKME · ~120 MACHINES · PARCOURS AD',
-        long:["Les certifications formalisent, mais elles ne remplacent pas la pratique. Je maintiens depuis deux ans un entraînement régulier sur Root-Me et TryHackMe, à raison de deux à trois soirées par semaine, avec une nette préférence pour les parcours orientés Active Directory et élévation de privilèges sous Windows.",
-               "Chaque machine résolue donne lieu à un compte rendu écrit selon un modèle constant : reconnaissance, vecteur d'entrée, chemin d'élévation, et surtout la contre-mesure qui aurait bloqué le scénario ainsi que la trace qu'il laisse côté supervision. Cette dernière partie est celle qui me sert le plus dans mon travail défensif.",
-               "Le total tourne autour de cent vingt machines. Le chiffre en lui-même ne veut pas dire grand-chose ; ce qui compte est la bibliothèque de contre-mesures documentées qu'il a produite, et qui alimente directement les procédures de durcissement que j'applique en production.",
-               "À moyen terme, je regarde l'OSCP comme aboutissement de cette pratique, mais sans le placer au calendrier : le coût et la charge de préparation ne sont réalistes qu'une fois en poste."] }
+      { t:'Certification 1', p:"Texte à compléter." },
+      { t:'Certification 2', p:"Texte à compléter." },
+      { t:'Certification 3', p:"Texte à compléter." },
+      { t:'Pratique régulière', p:"Texte à compléter." }
     ]
   },
   {
     id: 'competences', nom: 'Compétences', ville: 'Tokyo', lat: 35.68, lon: 139.69,
     blocs: [
-      { t:'Sécurité offensive',
-        p:"Tests d'intrusion internes, recherche de chemins d'élévation de privilèges et revue de configuration.",
-        d:'nmap · BloodHound · Burp Suite · Metasploit · Responder',
-        long:["Mon usage de l'offensif est utilitaire : il sert à valider que les mesures défensives fonctionnent réellement, pas à collectionner des exploits.",
-               "En pratique, cela consiste à repartir du point de vue d'un poste bureautique compromis : que voit-il sur le réseau, quels partages sont accessibles, quels comptes de service ont des mots de passe faibles, et quel chemin mène au contrôleur de domaine.",
-               "Les résultats sont restitués sous forme de chemins d'attaque concrets et priorisés, avec pour chacun la correction à appliquer et son coût réel d'exploitation."] },
-      { t:'Administration réseau',
-        p:"Segmentation en VLAN, routage inter-zones, règles de filtrage explicites et VPN site-à-site.",
-        d:'pfSense · FortiGate · Cisco IOS · 802.1X · IPsec',
-        long:["La segmentation est le cœur de mon travail réseau. Découper en VLAN cohérents avec les usages — bureautique, serveurs, production, administration, invités — puis poser un filtrage inter-zones qui refuse par défaut.",
-               "Sur les pare-feux, je travaille principalement avec pfSense et FortiGate : règles nommées et commentées, journalisation systématique des refus, et interconnexion des sites en IPsec.",
-               "Le contrôle d'accès au port en 802.1X vient compléter le dispositif côté commutation, pour qu'un équipement inconnu branché sur une prise se retrouve isolé plutôt que sur le réseau de production."] },
-      { t:'Infrastructure et automatisation',
-        p:"Virtualisation, annuaire, déploiements reproductibles et supervision proactive plutôt que réactive.",
-        d:'Proxmox · VMware ESXi · Active Directory · Ansible · Zabbix',
-        long:["Côté virtualisation je travaille avec Proxmox et VMware ESXi, avec une préférence pour Proxmox sur les environnements de laboratoire pour sa souplesse et son coût.",
-               "L'annuaire Active Directory est le point central de la plupart des parcs que j'administre : stratégies de groupe, délégations d'administration, gestion des comptes à privilèges et déploiement de LAPS.",
-               "L'automatisation passe par Ansible, ce qui permet de reconstruire un environnement complet de façon reproductible et de garder la configuration sous contrôle de version plutôt que dans la mémoire de l'équipe.",
-               "La supervision Zabbix est configurée pour alerter sur des tendances — remplissage disque, dérive de latence — et pas seulement sur des pannes déjà survenues."] },
-      { t:'Détection et réponse',
-        p:"Centralisation des journaux, règles de détection ciblées et procédures de réponse à incident écrites à l'avance.",
-        d:'Wazuh · Graylog · Suricata · MITRE ATT&CK',
-        long:["Journaliser sans centraliser ne sert à rien : les journaux locaux sont la première chose qu'un attaquant efface. La collecte est donc poussée vers un serveur dédié, en écriture seule pour les agents.",
-               "Les règles de détection sont volontairement peu nombreuses et ciblées sur les comportements réellement significatifs dans le contexte du parc, pour éviter le bruit qui finit par faire ignorer les alertes.",
-               "Les procédures de réponse — isolation d'un poste, révocation de comptes, restauration — sont rédigées à froid et testées, parce qu'un incident n'est pas le bon moment pour improviser."] }
+      { t:'Domaine 1', p:"Texte à compléter." },
+      { t:'Domaine 2', p:"Texte à compléter." },
+      { t:'Domaine 3', p:"Texte à compléter." },
+      { t:'Domaine 4', p:"Texte à compléter." }
     ]
   },
   {
     id: 'procedures', nom: 'Procédures', ville: 'Wellington', lat: -41.29, lon: 174.78,
     blocs: [
-      { t:'Réponse à incident',
-        p:"Isoler, préserver les traces, éradiquer, remettre en service. Une page par étape, écrite à froid et rejouée en exercice.",
-        d:'ISOLATION < 15 MIN · WAZUH · CHAÎNE D\'ESCALADE ÉCRITE',
-        long:["Un incident n'est pas le moment d'inventer une méthode. La procédure tient sur quatre pages, une par phase, et chacune commence par la seule question qui compte à ce moment-là : qui décide, qui exécute, qui prévient.",
-               "L'isolation vise quinze minutes entre la levée d'alerte Wazuh et la mise à l'écart du poste. Concrètement : bascule du port sur le VLAN de quarantaine, révocation des sessions Kerberos du compte concerné, et surtout interdiction formelle d'éteindre la machine tant que la mémoire vive n'a pas été capturée — c'est le réflexe le plus courant et celui qui détruit le plus de preuves.",
-               "La phase de qualification s'appuie sur les journaux déjà centralisés : recherche des connexions du compte sur les trente derniers jours, des créations de tâches planifiées et des exécutions inhabituelles. La chronologie est reconstruite dans un document horodaté qui sert ensuite de base à la déclaration éventuelle.",
-               "La remise en service passe systématiquement par une réinstallation depuis le master, jamais par un nettoyage. La procédure se termine par un retour d'expérience à quinze jours, dont la seule sortie obligatoire est la modification concrète apportée à l'infrastructure."] },
-      { t:'Durcissement d\'un serveur neuf',
-        p:"Une liste de trente-huit points appliquée avant toute mise en production, dont l'essentiel est automatisé en rôles Ansible.",
-        d:'38 POINTS · ANSIBLE · CIS BENCHMARK · RECETTE SIGNÉE',
-        long:["Aucun serveur ne rejoint le réseau de production sans être passé par la liste : renommage et sortie du compte administrateur par défaut, mise à jour complète, réduction des services et des rôles installés, pare-feu local en refus par défaut, chiffrement du disque, horodatage synchronisé et envoi des journaux vers le collecteur.",
-               "Une trentaine des trente-huit points sont portés par des rôles Ansible dérivés des recommandations CIS, ce qui rend le durcissement reproductible et surtout vérifiable : le même livre de jeu tourne en mode contrôle sur le parc existant et signale les dérives.",
-               "Les points restants sont ceux qui demandent une décision humaine — ouverture de flux, délégation d'administration, politique de sauvegarde — et font l'objet d'une recette écrite, datée et signée par l'exploitant avant la bascule.",
-               "La liste elle-même est versionnée : chaque incident ou chaque audit qui révèle un manque se traduit par une ligne supplémentaire, ce qui la fait vivre plutôt que de la laisser vieillir dans un classeur."] },
-      { t:'Sauvegarde et restauration testée',
-        p:"Une sauvegarde n'existe pas tant qu'elle n'a pas été restaurée. Test complet chaque trimestre, chronométré et consigné.",
-        d:'RÈGLE 3-2-1 · RESTAURATION TRIMESTRIELLE · RTO 4 H',
-        long:["Le plan suit la règle 3-2-1 : trois copies, sur deux supports différents, dont une hors site et déconnectée. Cette dernière copie est la seule qui protège réellement d'un rançongiciel, parce qu'elle n'est joignable par aucun compte du domaine.",
-               "La procédure de restauration décrit trois scénarios distincts : un fichier isolé demandé par un utilisateur, une machine virtuelle complète, et la reconstruction d'un contrôleur de domaine. Ils n'ont ni la même durée ni les mêmes prérequis, et les confondre dans une procédure unique revient à n'en avoir aucune.",
-               "Un test de restauration réel est mené chaque trimestre sur un environnement isolé, chronomètre en main. Le résultat est consigné avec la durée obtenue et l'écart au RTO annoncé de quatre heures. Les deux premiers tests l'ont dépassé, à cause d'un mot de passe de coffre absent de la documentation d'urgence : c'est exactement le genre de détail qu'un exercice révèle et qu'un incident réel aurait fait payer très cher.",
-               "La documentation d'urgence est imprimée et rangée hors du système d'information, puisqu'elle sert précisément quand celui-ci est indisponible."] },
-      { t:'Comptes à privilèges : entrée et sortie',
-        p:"Ouverture et fermeture des accès sur une procédure unique, avec une revue trimestrielle qui rattrape ce que les départs oublient.",
-        d:'LAPS · TIERING · REVUE TRIMESTRIELLE · BLOODHOUND',
-        long:["L'ouverture d'un compte à privilèges suit un formulaire court mais obligatoire : quel niveau du modèle en tiers, quel périmètre, quelle durée, et qui valide. Un compte d'administration est nominatif, distinct du compte bureautique de la même personne, et n'ouvre jamais de session sur un poste utilisateur.",
-               "La sortie est la partie que les organisations ratent le plus souvent, parce qu'elle n'a pas d'urgence apparente. La procédure impose donc un ordre : désactivation avant suppression, retrait des appartenances aux groupes à privilèges, révocation des accès distants et des clés, puis rotation des secrets partagés que la personne connaissait.",
-               "Une revue trimestrielle passe en revue l'ensemble des groupes à privilèges et confronte la liste aux effectifs réels. Elle est doublée d'un passage BloodHound qui vérifie qu'aucun chemin court n'est réapparu entre un utilisateur standard et les droits de domaine — les délégations se remettent en place toutes seules au fil des dépannages.",
-               "Côté administrateurs locaux, LAPS retire complètement le sujet : le mot de passe est unique par machine, renouvelé automatiquement, et sa consultation est journalisée."] }
+      { t:'Procédure 1', p:"Texte à compléter." },
+      { t:'Procédure 2', p:"Texte à compléter." },
+      { t:'Procédure 3', p:"Texte à compléter." },
+      { t:'Procédure 4', p:"Texte à compléter." }
     ]
   },
   {
     id: 'projets', nom: 'Projets', ville: 'New York', lat: 40.71, lon: -74.01,
     blocs: [
-      { t:'Segmentation d\'un réseau industriel',
-        p:"Découpage d'un réseau plat en neuf zones filtrées. Surface d'exposition des automates réduite de 70 %.",
-        d:'FortiGate · 9 VLAN · 802.1X · −70 % D\'EXPOSITION',
-        long:["Le site fonctionnait sur un réseau unique où les postes bureautiques, les serveurs et les automates de production partageaient le même domaine de diffusion. N'importe quel poste infecté pouvait atteindre directement la couche industrielle.",
-               "Nous avons découpé le réseau en neuf zones : bureautique, serveurs, supervision industrielle, automates, impression, invités, administration, sauvegarde et interconnexion. Chaque flux inter-zones a été identifié, puis autorisé explicitement sur le FortiGate.",
-               "La migration s'est faite zone par zone sur six semaines, avec une phase d'observation en journalisation seule avant chaque bascule en mode bloquant, ce qui a permis de découvrir plusieurs flux non documentés sans jamais interrompre la production.",
-               "Le résultat mesuré : le nombre d'équipements pouvant atteindre la couche automate est passé de l'intégralité du parc à une trentaine de machines identifiées, soit une réduction d'environ 70 % de la surface d'exposition."] },
-      { t:'Durcissement Active Directory',
-        p:"Audit des chemins d'attaque puis remise à plat des privilèges. De 34 comptes administrateurs de domaine à 6.",
-        d:'BloodHound · GPO · LAPS · Tiering · 34 → 6 COMPTES',
-        long:["L'audit initial, mené avec BloodHound, a mis en évidence plusieurs chemins permettant à un simple utilisateur du domaine d'atteindre les droits d'administrateur de domaine en trois à quatre étapes, principalement via des délégations mal maîtrisées et des mots de passe d'administrateur local identiques sur tout le parc.",
-               "La correction a suivi trois axes. D'abord le déploiement de LAPS, qui rend unique et renouvelable le mot de passe administrateur local de chaque machine. Ensuite la mise en place d'un modèle en niveaux, séparant les comptes d'administration du domaine, des serveurs et des postes.",
-               "Enfin, la revue complète des appartenances aux groupes à privilèges : trente-quatre comptes disposaient des droits d'administrateur de domaine, souvent par héritage historique. Après analyse des besoins réels, ce nombre est descendu à six comptes nominatifs, avec authentification renforcée.",
-               "Un nouvel audit BloodHound en fin de chantier n'a plus fait apparaître de chemin court entre un utilisateur standard et les droits de domaine."] },
-      { t:'Laboratoire de test d\'intrusion',
-        p:"Plateforme reproduisant un système d'information d'entreprise, redéployable intégralement en douze minutes.",
-        d:'Proxmox · Ansible · Kali · 12 MIN DE DÉPLOIEMENT',
-        long:["Pour tester des techniques offensives et valider des correctifs sans jamais toucher à un environnement de production, j'ai construit un laboratoire complet sur Proxmox : contrôleur de domaine, serveur de fichiers, postes clients Windows, pare-feu pfSense et machine d'attaque Kali.",
-               "L'ensemble est décrit dans des rôles Ansible. Une reconstruction complète depuis zéro prend environ douze minutes, ce qui permet de repartir d'un état propre après chaque scénario plutôt que de nettoyer manuellement.",
-               "Le laboratoire est volontairement configuré avec les faiblesses les plus courantes rencontrées en entreprise, ce qui en fait aussi un support de démonstration efficace pour expliquer un risque à une direction non technique.",
-               "Les scénarios et leurs contre-mesures sont documentés dans un dépôt public, avec pour chacun la trace observable côté supervision."] }
+      { t:'Projet 1', p:"Texte à compléter." },
+      { t:'Projet 2', p:"Texte à compléter." },
+      { t:'Projet 3', p:"Texte à compléter." }
     ]
   },
   {
     id: 'contact', nom: 'Contact', ville: 'Singapour', lat: 1.35, lon: 103.82,
     blocs: [
       { t:'Courriel',
-        p:"Le canal le plus direct. Réponse sous vingt-quatre heures les jours ouvrés.",
+        p:"Texte à compléter.",
         d:'<a href="mailto:arthur.formentin@sts-sio-caen.info">arthur.formentin@sts-sio-caen.info</a>',
-        html:true,
-        long:["Pour toute proposition de mission, d'alternance ou simplement pour échanger sur un sujet technique, le courriel reste le moyen le plus efficace de me joindre.",
-               "Je réponds sous vingt-quatre heures les jours ouvrés. Si votre demande porte sur une infrastructure existante, précisez la taille approximative du parc et la problématique principale : cela permet d'aller droit au but dès le premier échange."] },
-      { t:'LinkedIn',
-        p:"Parcours détaillé, recommandations et publications techniques ponctuelles.",
-        d:'<a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer">linkedin.com/in/arthur-formentin</a>',
-        html:true,
-        long:["Mon profil LinkedIn reprend le détail des expériences, des environnements techniques rencontrés et des recommandations obtenues.",
-               "J'y publie occasionnellement des retours d'expérience courts sur des chantiers d'infrastructure ou de sécurisation, en veillant à ne jamais exposer d'élément identifiant sur les environnements concernés."] },
-      { t:'GitHub',
-        p:"Laboratoires reproductibles, rôles Ansible et comptes rendus de tests d'intrusion anonymisés.",
-        d:'<a href="https://github.com/" target="_blank" rel="noopener noreferrer">github.com/arthur-formentin</a>',
-        html:true,
-        long:["Le dépôt public regroupe les rôles Ansible utilisés pour construire mon laboratoire, quelques scripts d'audit et les comptes rendus de scénarios offensifs, systématiquement anonymisés.",
-               "L'objectif est double : garder une trace exploitable de mon propre travail, et fournir des supports reproductibles à qui veut monter un environnement d'entraînement équivalent."] },
-      { t:'Disponibilité',
-        p:"Ouvert aux opportunités. Interventions sur site planifiables, télétravail partiel envisageable.",
-        d:'STATUT : DISPONIBLE · UTC+1 · CAEN, FR',
-        long:["Je suis disponible pour une alternance ou une mission en administration réseau et sécurité.",
-               "Les interventions physiques sur les équipements se planifient sans difficulté sur la Normandie et l'Île-de-France. Le reste du travail — configuration, automatisation, documentation, analyse — peut se faire à distance."] }
+        html:true },
+      { t:'Réseaux',
+        p:"Texte à compléter.",
+        // Rangée de pastilles icône seule — voir SOCIAUX plus haut.
+        d:socialsHTML(),
+        html:true }
     ]
   }
 ];
