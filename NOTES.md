@@ -170,9 +170,99 @@ centre de l'écran — l'hypothèse sur laquelle repose `layoutBlocks` — avant
 mesure ; sans cela, la moitié des « chevauchements » observés n'étaient que des
 captures prises en pleine animation.
 
+## Passe « satellites de liens » — de Contact vers Projets
+
+### Ce qui a changé et pourquoi
+
+Les trois liens (LinkedIn, GitHub, courriel) avaient d'abord été posés en
+pastilles dans la rubrique Contact, puis chacun dans sa propre petite carte,
+puis en triangle autour de la carte « Réseaux ». Retour du propriétaire : ce
+qui gêne, ce n'est pas le triangle, c'est la **carte** — trois glyphes enfermés
+dans une boîte à bordure et à fond, eux-mêmes posés dans une autre boîte. Les
+liens sont donc déplacés dans la rubrique **Projets**, et surtout dépouillés de
+tout ce qui dessinait un contenant.
+
+- **Contact** revient à deux cartes : `Courriel` (inchangée) et `Disponibilité`.
+  Un cadre « Réseaux » vidé de ses liens n'aurait plus rien annoncé ; le second
+  sujet naturel de la rubrique reprend sa place, comme avant la passe pastilles.
+  La mise en page à deux cartes est donc préservée telle quelle.
+- **Projets** porte désormais l'indicateur `sats:true` dans `RUBRIQUES`. C'est
+  le seul point de bascule : aucune autre rubrique n'a à savoir que ces liens
+  existent, et les déplacer à nouveau ne demandera que de bouger ce drapeau.
+
+### Ce qui disparaît du style : tout le vocabulaire de la carte
+
+`a.social` n'a plus ni `background`, ni `border`, ni `box-shadow`, ni
+`backdrop-filter`, ni liseré de connexion sur l'arête haute (`::before` a changé
+de métier). Il ne reste que le glyphe. Ce qui le détache du globe est une
+**ombre portée sur le dessin lui-même** (`drop-shadow`), pas une surface : rien
+ne borde le lien, mais il ne se noie pas dans les points de la carte du monde.
+La surface cliquable tombe de 58 à 48 px — toujours au-dessus de la cible
+tactile de 44 px, mais sans matière visible pour la trahir.
+
+Ce qui est conservé, à l'identique ou presque :
+
+- le flottement orbital déphasé (8,4 s / 10,6 s / 9,3 s, trois délais négatifs,
+  sens inversé au milieu), amplitude portée de 3,2 à 4,2 px — un corps libre
+  peut respirer un peu plus large qu'une carte ;
+- l'arrêt de l'orbite au survol et au focus (`animation-play-state:paused`) ;
+- le cadre du logo qui se retrace (`.frame`, `stroke-dashoffset`) et l'onde
+  unique de connexion au survol/focus, redessinée en cercle pour ne plus
+  ressembler au contour d'une boîte ;
+- le halo de survol, devenu un dégradé radial qui s'éteint avant le bord :
+  il éclaire sans jamais tracer de contour ;
+- glyphe seul sans texte, `aria-label` + `title`, coupure totale sous
+  `prefers-reduced-motion`.
+
+### Trois placements pour un seul balisage
+
+`socialsHTML(variante)` rend le même HTML dans deux habillages :
+
+1. **`field` (desktop)** — injecté dans un nouveau calque `#sats`, fixé plein
+   écran et transparent aux clics (seuls les liens captent). Les satellites y
+   sont posés en **coordonnées d'écran** par la boucle de rendu, autour du nœud
+   de la rubrique, exactement comme les cartes de contenu : ils suivent donc le
+   globe, et s'atténuent quand le nœud passe derrière lui (jamais tant qu'un
+   satellite a le focus clavier — `#sats:focus-within` reprend la main).
+2. **`row` (feuille mobile)** — en portrait il n'y a aucun espace libre autour
+   du nœud ; la rangée est posée **à même la feuille**, hors de toute `.card`,
+   après les fiches de la rubrique.
+3. **`row` (repli sans WebGL)** — même rangée, en fin de section Projets.
+
+Le placement desktop est calculé par `layoutSats()`, appelée en fin de
+`layoutBlocks()` qui vient de mesurer, pour de vrai, la bande centrale laissée
+libre par les deux colonnes de cartes. Deux compositions :
+
+- **triangle** quand la place existe : deux satellites encadrent le titre de la
+  rubrique, le troisième descend sous les coordonnées ;
+- **chapelet vertical** sous le nœud dès que les colonnes mordent sur la bande
+  centrale (en pratique sous ~1 000 px de large, où les cartes sont déjà
+  ramenées de force vers le milieu). Mieux vaut une colonne qui tient qu'un
+  triangle qui heurte une carte.
+
+### Vérifications de cette passe
+
+Navigateur headless (Edge Chromium piloté par puppeteer-core, WebGL logiciel) :
+**300 vérifications passées, aucune erreur console.** Sur 1440×900, 1366×768,
+1280×800, 1152×720, 1024×700 et 900×640 : trois satellites présents, cible ≥ 44 px,
+aucun texte visible, `aria-label` et `title` posés, focusables, **fond
+transparent / bordure nulle / ombre de boîte nulle** (la non-régression qui
+compte : plus jamais de carte), orbite active avec trois durées et trois
+déphasages distincts dont un sens inversé, aucun contact avec les trois cartes
+de Projets ni avec la barre de nœuds, rien hors écran. S'y ajoutent : Contact
+réduit à deux cartes sans la moindre icône, `Tab` puis `Échap` depuis un
+satellite avec focus rendu à la barre et calque vidé, feuille mobile 375×780
+(rangée hors carte, sans débordement horizontal, calque desktop masqué),
+`prefers-reduced-motion` (orbite coupée, aucun décalage résiduel) et le repli
+sans three.js (7 sections, rangée de trois liens dans la section Projets).
+
+Contrôle complémentaire à 830 px — le pire cas desktop, juste au-dessus du
+palier mobile : le chapelet vertical se place bien entre les deux colonnes et
+s'arrête 45 px au-dessus de la barre de nœuds.
+
 ## Limites connues / à savoir
 
 - Le CDN Three.js et Google Fonts nécessitent une connexion réseau au premier chargement (la carte du monde, elle, est entièrement inline). Un message s'affiche si le réseau est indisponible.
 - Les tracés côtiers sont volontairement simplifiés (~40 à 70 sommets par continent) : lisibles à l'échelle du globe, approximatifs si on zoomait fortement.
-- Contenu de la rubrique Contact : l'adresse email est la vraie adresse de l'utilisateur (gardée volontairement, décision explicite). **Les liens LinkedIn et GitHub sont des placeholders fictifs** (`linkedin.com/in/arthur-formentin`, `github.com/arthur-formentin`) — à remplacer par les vrais liens avant mise en ligne définitive.
+- Les trois destinations de `SOCIAUX` sont réelles : adresse courriel de l'utilisateur (gardée volontairement, décision explicite), profil LinkedIn et compte GitHub `Nomalovv`. Elles vivent maintenant dans la rubrique **Projets**, plus dans Contact.
 - Tout le reste du contenu (parcours, compétences, projets) est un placeholder réaliste à adapter.

@@ -383,96 +383,92 @@ canvas#scene{position:fixed; inset:0; z-index:2; display:block; touch-action:non
 .block a:hover{border-bottom-color:rgba(0,212,255,.9); color:#d5faff}
 
 /* ============================================================
-   CARTES DE LIENS — rubrique Contact
-   Une destination = une petite carte autonome, dans le même vocabulaire
-   que les cartes de contenu : vitre, liseré de connexion sur l'arête
-   haute, bordure et ombre portée. Trois couches, chacune son rôle, pour
-   qu'aucune ne se marche dessus sur la propriété « transform » :
+   SATELLITES DE LIENS — rubrique Projets
+   Une destination = un glyphe seul, SANS carte : ni vitre, ni bordure,
+   ni ombre portée de boîte. Ce sont des corps libres qui flottent dans
+   l'espace de la rubrique, au même titre que les nœuds décoratifs du
+   globe — surtout pas trois pastilles rangées dans un cadre.
+   Trois couches, chacune sa propriété, pour qu'aucune ne se marche
+   dessus sur « transform » :
      .orb        le flottement orbital permanent
-     a.social    la carte elle-même et l'interaction survol/focus
-     svg         le glyphe, dont le cadre se retrace
+     a.social    le glyphe et l'interaction survol/focus
+     svg         le dessin, dont le cadre se retrace
    Ajouter une destination ne demande qu'une entrée dans SOCIAUX, côté
    script — rien à toucher ici.
    Les sélecteurs portent sur « a.social » et non « .social » pour repasser
    devant les liens texte de .block / #sheet, qui sont soulignés.
    ============================================================ */
-/* Champ d'orbite : les cartes ne sont pas rangées côte à côte, elles sont
-   dispersées sur le pourtour de la carte « Réseaux ». Le champ réserve sa
-   hauteur dans le flux, les satellites y sont placés en absolu — le moteur
-   de placement mesure la hauteur réelle des cartes, il s'y adapte seul.
-   Les décalages négatifs les font mordre vers les bords du cadre sans jamais
-   sortir de la marge intérieure, que « overflow:hidden » couperait. */
-.socials{display:block; position:relative; height:150px; margin-top:12px}
+/* Calque d'écran : les satellites sont posés en coordonnées d'écran par la
+   boucle de rendu, autour du nœud de la rubrique ouverte — ils suivent donc
+   le globe exactement comme les cartes de contenu, sans être contenus dans
+   quoi que ce soit. Le calque ne capte rien : seuls les liens le font, pour
+   ne pas voler un glisser du globe. */
+#sats{
+  position:fixed; inset:0; z-index:5; pointer-events:none;
+  opacity:0; transition:opacity .5s var(--ease);
+}
+/* Le calque s'atténue quand le nœud passe derrière le globe (opacité posée
+   par la boucle de rendu) — jamais tant qu'un satellite a le focus clavier. */
+#sats:focus-within{opacity:1 !important}
+.socials.field .orb{position:absolute}
+/* Variante en flux : feuille mobile et repli texte, où il n'y a pas d'espace
+   libre à occuper. Une simple rangée posée dans la page, toujours sans cadre. */
+.socials.row{display:flex; flex-wrap:wrap; gap:16px; margin:16px 0 2px}
 /* --- Couche 1 : l'orbite ---------------------------------------------------
-   Trois ancrages distincts — bord gauche en haut, bord droit à mi-hauteur,
-   bord bas au centre : un triangle, jamais une rangée. Chaque carte décrit
-   ensuite une petite ellipse autour de son point d'ancrage, comme les nœuds
-   qui tournent avec le globe. Trois durées, trois phases et un sens inversé
-   au centre : rien ne bat la mesure ensemble. L'amplitude tient en trois
-   pixels — on doit le sentir sans jamais le regarder. */
-.socials .orb{position:absolute; display:inline-flex; animation:social-orbit 9s linear infinite}
-.socials .orb:nth-child(1){
-  left:-6px; top:0;
-  animation-duration:8.4s; animation-delay:-1.1s;
-}
-.socials .orb:nth-child(2){
-  right:-6px; top:46px;
-  animation-duration:10.6s; animation-delay:-4.7s; animation-direction:reverse;
-}
-.socials .orb:nth-child(3){
-  left:calc(50% - 29px); bottom:-2px;
-  animation-duration:9.3s; animation-delay:-6.2s;
-}
-/* L'orbite se fige dès qu'on vise la carte : la cible ne se dérobe pas sous
+   Chaque satellite décrit une petite ellipse autour de son point d'ancrage,
+   comme les nœuds qui tournent avec le globe. Trois durées, trois phases et
+   un sens inversé au milieu : rien ne bat la mesure ensemble. L'amplitude
+   tient en quatre pixels — on doit le sentir sans jamais le regarder. */
+.socials .orb{display:inline-flex; animation:social-orbit 9s linear infinite}
+.socials .orb:nth-child(1){animation-duration:8.4s; animation-delay:-1.1s}
+.socials .orb:nth-child(2){animation-duration:10.6s; animation-delay:-4.7s; animation-direction:reverse}
+.socials .orb:nth-child(3){animation-duration:9.3s; animation-delay:-6.2s}
+/* L'orbite se fige dès qu'on vise le glyphe : la cible ne se dérobe pas sous
    le curseur, et l'attention n'est plus disputée pendant la lecture. */
 .socials .orb:hover,.socials .orb:focus-within{animation-play-state:paused}
 @keyframes social-orbit{
-  0%  {transform:translate(0,-3.2px)}
-  12.5%{transform:translate(1.8px,-2.3px)}
-  25% {transform:translate(2.5px,0)}
-  37.5%{transform:translate(1.8px,2.3px)}
-  50% {transform:translate(0,3.2px)}
-  62.5%{transform:translate(-1.8px,2.3px)}
-  75% {transform:translate(-2.5px,0)}
-  87.5%{transform:translate(-1.8px,-2.3px)}
-  100%{transform:translate(0,-3.2px)}
+  0%  {transform:translate(0,-4.2px)}
+  12.5%{transform:translate(2.4px,-3px)}
+  25% {transform:translate(3.4px,0)}
+  37.5%{transform:translate(2.4px,3px)}
+  50% {transform:translate(0,4.2px)}
+  62.5%{transform:translate(-2.4px,3px)}
+  75% {transform:translate(-3.4px,0)}
+  87.5%{transform:translate(-2.4px,-3px)}
+  100%{transform:translate(0,-4.2px)}
 }
-/* --- Couche 2 : la carte --------------------------------------------------- */
+/* --- Couche 2 : le glyphe libre --------------------------------------------
+   Aucun fond, aucune bordure : la surface reste cliquable sur 48 px (la cible
+   tactile de 44 px est tenue), mais rien ne la dessine. Ce qui détache le
+   glyphe du globe, c'est son ombre portée — pas une boîte. */
 a.social{
-  position:relative;
+  position:relative; pointer-events:auto;
   display:inline-flex; align-items:center; justify-content:center;
-  flex:none; width:58px; height:58px;   /* bien au-delà de la cible de 44 px */
-  border:1px solid var(--glass-brd); border-radius:12px;
-  background:var(--glass);
-  -webkit-backdrop-filter:blur(18px) saturate(1.3);
-  backdrop-filter:blur(18px) saturate(1.3);
-  box-shadow:0 14px 34px -18px rgba(0,0,0,.9), inset 0 1px 0 rgba(143,199,232,.06);
+  flex:none; width:48px; height:48px;
+  border:0; border-radius:50%; background:none; box-shadow:none;
   color:var(--text-dim); text-decoration:none;
-  transition:color .3s var(--ease), border-color .3s var(--ease),
-             background-color .3s var(--ease), transform .45s var(--ease-out),
-             box-shadow .35s var(--ease);
+  filter:drop-shadow(0 2px 9px rgba(3,8,20,.95));
+  transition:color .3s var(--ease), transform .45s var(--ease-out),
+             filter .35s var(--ease);
 }
-/* Liseré de connexion sur l'arête haute — exactement celui des cartes de
-   contenu, resserré pour ne pas déborder des angles arrondis. */
+/* Halo de survol : un dégradé radial qui s'éteint avant le bord — il éclaire
+   le glyphe sans jamais tracer de contour, donc sans recréer une carte. */
 a.social::before{
-  content:""; position:absolute; left:11px; right:11px; top:0; height:1px;
-  pointer-events:none;
-  background:linear-gradient(90deg,transparent,rgba(0,212,255,.55),transparent);
-  transition:opacity .3s var(--ease); opacity:.75;
+  content:""; position:absolute; inset:-3px; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle,rgba(0,212,255,.24),rgba(0,212,255,0) 70%);
+  opacity:0; transition:opacity .3s var(--ease);
 }
 /* Onde de connexion : UN seul ping, émis à la prise de survol/focus.
    Une boucle infinie serait de la décoration ; ici l'onde signifie le
    contact établi, exactement comme les arcs entre les nœuds du globe. */
 a.social::after{
-  content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+  content:""; position:absolute; inset:2px; border-radius:50%; pointer-events:none;
   border:1px solid var(--accent); opacity:0;
 }
 a.social:hover,a.social:focus-visible{
   color:var(--accent-soft);
-  border-color:var(--glass-brd-hi);
-  background:rgba(0,212,255,.13);
   transform:translateY(-3px);
-  box-shadow:0 18px 38px -18px rgba(0,212,255,.7), inset 0 1px 0 rgba(143,199,232,.12);
+  filter:drop-shadow(0 4px 14px rgba(0,212,255,.55));
 }
 a.social:hover::before,a.social:focus-visible::before{opacity:1}
 a.social:hover::after,a.social:focus-visible::after{animation:social-ping .85s var(--ease-out) 1}
@@ -480,9 +476,9 @@ a.social:hover::after,a.social:focus-visible::after{animation:social-ping .85s v
 a.social:active{transform:translateY(-1px) scale(.96)}
 @keyframes social-ping{
   0%{opacity:.85; transform:scale(1)}
-  100%{opacity:0; transform:scale(1.28)}
+  100%{opacity:0; transform:scale(1.3)}
 }
-a.social svg{width:24px; height:24px; display:block}
+a.social svg{width:26px; height:26px; display:block}
 /* Signature visuelle : le cadre du logo se retrace, comme une liaison qui
    s'établit. Le glyphe, lui, ne bouge pas — un seul mouvement porteur de
    sens par pastille, le reste n'est que couleur et lumière. */
@@ -494,14 +490,15 @@ a.social .frame{
 a.social:hover .frame,a.social:focus-visible .frame{opacity:1; animation:social-trace .9s var(--ease-out) 1}
 @keyframes social-trace{from{stroke-dashoffset:96} to{stroke-dashoffset:0}}
 a.social .glyph{fill:currentColor}
-/* Pas d'étiquette dessinée : les pastilles sont muettes, le glyphe porte tout.
+/* Pas d'étiquette dessinée : les satellites sont muets, le glyphe porte tout.
    La destination reste annoncée par « aria-label » aux lecteurs d'écran, et
    « title » fournit l'infobulle native du navigateur au survol prolongé. */
-/* Contextes où un « a » est stylé par un sélecteur d'identifiant */
-#sheet a.social,#fatal.doc a.social{color:var(--text-dim); border-bottom-color:var(--glass-brd)}
+/* Contextes où un « a » est stylé par un sélecteur d'identifiant : on retire
+   le soulignement des liens texte, qui redessinerait une arête sous le glyphe. */
+#sheet a.social,#fatal.doc a.social{color:var(--text-dim); border-bottom:0}
 #sheet a.social:hover,#sheet a.social:focus-visible,
 #fatal.doc a.social:hover,#fatal.doc a.social:focus-visible{
-  color:var(--accent-soft); border-bottom-color:var(--glass-brd-hi);
+  color:var(--accent-soft); border-bottom:0;
 }
 
 /* Écran bas (portable 1366×768, 1024×640…). Deux cartes empilées de 250 px
@@ -516,10 +513,6 @@ a.social .glyph{fill:currentColor}
   .block p{font-size:13px; line-height:1.5}
   .block .data{margin-top:10px; font-size:10.5px; line-height:1.5}
   .block .more{margin-top:11px; min-height:30px; padding:5px 10px}
-  /* Écran bas : le champ d'orbite se resserre comme le reste de la carte,
-     les trois ancrages gardent leur triangle. */
-  .block .socials{height:126px; margin-top:8px}
-  .block .socials .orb:nth-child(2){top:34px}
 }
 
 /* Pancartes permanentes des rubriques (état de repos + état survolé).
@@ -776,6 +769,9 @@ body.open #close{
   #intro h1{max-width:100%}
   #enter{align-self:stretch; justify-content:space-between}
   .block{display:none !important}
+  /* Pas de cartes en orbite en portrait, donc pas d'espace libre autour du
+     nœud : les satellites repassent en rangée dans la feuille de contenu. */
+  #sats{display:none !important}
   #anchor-title,#anchor-coords{display:none !important}
   #links{display:none}
   /* Pancartes resserrées : le globe est plus petit et le survol n'existe pas */
@@ -815,9 +811,10 @@ body.open #close{
   #modal,#modal .sheetbox,#sheet{transition-duration:.15s !important}
   #close:hover{transform:none}
   #enter:hover,.block.in:hover{transform:none}
-  /* Les cartes de contact gardent le changement de couleur, pas le mouvement :
-     le flottement orbital s'arrête net, les cartes reprennent leur place. */
+  /* Les satellites gardent le changement de couleur, pas le mouvement : le
+     flottement orbital s'arrête net, les glyphes reprennent leur place. */
   .socials .orb{animation:none !important; transform:none !important}
+  #sats{transition-duration:.15s !important}
   a.social{transition-duration:.15s !important}
   a.social:hover,a.social:focus-visible,a.social:active{transform:none}
   a.social:hover::after,a.social:focus-visible::after{animation:none}
@@ -849,6 +846,7 @@ body.open #close{
 </section>
 
 <div id="orbit"></div>
+<div id="sats"></div>
 <div id="anchor-title"><h2></h2></div>
 <div id="anchor-coords"></div>
 <div id="tags" aria-hidden="true"></div>
@@ -892,9 +890,9 @@ var isMobile = function () { return window.innerWidth <= 820; };
    Déclarées AVANT le garde-fou three.js : sans WebGL le globe disparaît, mais
    le contenu, lui, doit rester lisible (voir renderFallbackDoc plus bas).
    ========================================================================== */
-/* --- 1.a Pastilles de liens (rubrique Contact) -----------------------------
-   Une entrée = une pastille dans la rangée. Les glyphes sont des SVG écrits
-   ici même : aucune dépendance à une bibliothèque d'icônes externe.
+/* --- 1.a Satellites de liens (rubrique Projets) ----------------------------
+   Une entrée = un satellite qui flotte autour de la rubrique. Les glyphes sont
+   des SVG écrits ici même : aucune dépendance à une bibliothèque d'icônes.
    Chaque SVG se compose de deux parties, et c'est ce que la feuille de style
    anime : « frame » (le cadre, retracé au survol) et « glyph » (le symbole).
    Ajouter une destination = ajouter une entrée ici, rien d'autre.
@@ -933,13 +931,15 @@ var SOCIAUX = [
   }
 ];
 
-/* Rend la rangée. Le résultat est injecté tel quel dans le champ « d » d'un
-   bloc marqué « html:true » — donc identique sur le globe, sur la feuille
-   mobile et dans le repli texte sans WebGL.
-   Les pastilles n'affichent aucun texte : le nom part dans « aria-label »
+/* Rend les trois satellites. Deux variantes du même balisage :
+     « field » — posés en coordonnées d'écran autour du nœud de la rubrique
+                 ouverte (desktop), donc libres, sans rien autour ;
+     « row »   — rangée dans le flux, pour la feuille mobile et le repli texte,
+                 où il n'existe pas d'espace libre à occuper.
+   Les satellites n'affichent aucun texte : le nom part dans « aria-label »
    pour les lecteurs d'écran et dans « title » pour l'infobulle native. */
-function socialsHTML() {
-  return '<span class="socials">' + SOCIAUX.map(function (s) {
+function socialsHTML(variante) {
+  return '<span class="socials ' + (variante || 'row') + '">' + SOCIAUX.map(function (s) {
     return '<span class="orb">' +
            '<a class="social" href="' + s.href + '"' +
            (s.externe ? ' target="_blank" rel="noopener noreferrer"' : '') +
@@ -997,6 +997,9 @@ var RUBRIQUES = [
   },
   {
     id: 'projets', nom: 'Projets', ville: 'New York', lat: 40.71, lon: -74.01,
+    // « sats » : les trois liens (LinkedIn, GitHub, courriel) gravitent autour
+    // de cette rubrique, hors des cartes — voir SOCIAUX et buildSats().
+    sats: true,
     blocs: [
       { t:'Projet 1', p:"Texte à compléter." },
       { t:'Projet 2', p:"Texte à compléter." },
@@ -1010,11 +1013,11 @@ var RUBRIQUES = [
         p:"Texte à compléter.",
         d:'<a href="mailto:arthur.formentin@sts-sio-caen.info">arthur.formentin@sts-sio-caen.info</a>',
         html:true },
-      { t:'Réseaux',
-        p:"Texte à compléter.",
-        // Rangée de pastilles icône seule — voir SOCIAUX plus haut.
-        d:socialsHTML(),
-        html:true }
+      // Les liens LinkedIn / GitHub ne sont plus ici : ils gravitent autour de
+      // la rubrique Projets. Contact garde ses deux cartes, la seconde revient
+      // au sujet qu'elle traitait avant, sans cadre vide à moitié rempli.
+      { t:'Disponibilité',
+        p:"Texte à compléter." }
     ]
   }
 ];
@@ -1082,6 +1085,12 @@ function renderFallbackDoc(raison) {
       }
       sec.appendChild(art);
     });
+    // Repli texte : la rangée de liens clôt la rubrique qui les porte.
+    if (r.sats) {
+      var sw = document.createElement('div');
+      sw.innerHTML = socialsHTML('row');
+      sec.appendChild(sw.firstChild);
+    }
     el.appendChild(sec);
   });
 
@@ -1845,8 +1854,10 @@ var elTags = document.getElementById('tags');
 var elSheet = document.getElementById('sheet');
 var elModal = document.getElementById('modal');
 var elHits = document.getElementById('hits');
+var elSats = document.getElementById('sats');
 
 var blocks = [];       // { el, line, offX, offY, w, h }
+var sats = [];         // { el, offX, offY } — satellites de liens, hors cartes
 
 var fmtCoords = fmtCoordsOf;
 
@@ -2055,6 +2066,11 @@ function layoutBlocks(px, py) {
     if (Math.max(alt[0].total, alt[1].total) < Math.max(cols[0].total, cols[1].total)) cols = alt;
   }
 
+  // Bande centrale réellement libre de part et d'autre du nœud, mesurée après
+  // coup : c'est là que flottent les satellites de liens, et sur un écran
+  // étroit les colonnes de cartes viennent y mordre.
+  var bandL = px - M, bandR = W - M - px;
+
   for (var ci = 0; ci < 2; ci++) {
     var col = cols[ci];
     if (!col.items.length) continue;
@@ -2062,6 +2078,8 @@ function layoutBlocks(px, py) {
     // Colonne collée à la zone réservée, puis ramenée dans l'écran.
     var x = (ci === 0) ? (px - RES - GAP - col.w) : (px + RES + GAP);
     x = Math.max(M, Math.min(W - M - col.w, x));
+    if (ci === 0) bandL = Math.min(bandL, px - (x + col.w));
+    else bandR = Math.min(bandR, x - px);
 
     // Dernier recours quand la pile dépasse quand même : on resserre la
     // gouttière plutôt que de laisser une carte sortir de l'écran.
@@ -2082,6 +2100,38 @@ function layoutBlocks(px, py) {
       y += b.h + gap;
     }
   }
+
+  layoutSats(px, py, bandL, bandR, HB, M);
+}
+
+/* Place les satellites de liens autour du nœud, dans la bande centrale que
+   les cartes laissent libre. Ils ne sont pas rangés dans une boîte : chacun
+   reçoit un décalage en pixels par rapport au nœud, la boucle de rendu le
+   suit ensuite comme elle suit les cartes.
+
+   Composition visée : un triangle autour du point d'ancrage — deux satellites
+   qui encadrent le titre de la rubrique, un troisième qui descend sous les
+   coordonnées. Si l'écran est trop étroit pour que ce triangle passe entre
+   les deux colonnes de cartes, les trois descendent en chapelet sous le nœud
+   plutôt que d'aller heurter une carte. */
+var SAT_R = 24;          // demi-côté d'un satellite (48 px)
+function layoutSats(px, py, bandL, bandR, HB, M) {
+  if (!sats.length) return;
+  var room = Math.min(bandL, bandR) - 34;        // respiration gardée avec les cartes
+  var dx = Math.min(158, room);
+  var down = Math.max(84, Math.min(118, HB - M - SAT_R - py));
+  var off;
+  if (dx >= 82) {
+    off = [[-dx, -70], [dx, -70], [0, down]];
+  } else {
+    var step = Math.max(50, Math.min(58, (HB - M - SAT_R - (py + 84)) / 2));
+    off = [[0, 84], [0, 84 + step], [0, 84 + step * 2]];
+  }
+  for (var k = 0; k < sats.length; k++) {
+    var o = off[k % off.length];
+    sats[k].offX = o[0];
+    sats[k].offY = o[1];
+  }
 }
 
 /* --- 8.3 Ouverture d'une rubrique ---------------------------------------- */
@@ -2089,6 +2139,22 @@ function clearBlocks() {
   blocks.forEach(function (b) { if (b.el.parentNode) b.el.parentNode.removeChild(b.el); });
   blocks = [];
   while (svg.firstChild) svg.removeChild(svg.firstChild);
+}
+
+/* Satellites de liens : le calque est vidé entre deux rubriques, il ne reste
+   donc jamais de lien focusable pour une rubrique qui n'est plus affichée. */
+function clearSats() {
+  sats = [];
+  elSats.innerHTML = '';
+  elSats.style.opacity = '0';
+}
+
+function buildSats(r) {
+  clearSats();
+  if (!r.sats || isMobile()) return;
+  elSats.innerHTML = socialsHTML('field');
+  var orbs = elSats.querySelectorAll('.orb');
+  for (var i = 0; i < orbs.length; i++) sats.push({ el: orbs[i], offX: 0, offY: 0 });
 }
 
 function openRubrique(idx) {
@@ -2104,6 +2170,7 @@ function openRubrique(idx) {
   announce(r.nom + ' — ' + r.ville + '. ' + r.blocs.length + ' fiches affichées.');
 
   clearBlocks();
+  clearSats();
 
   if (isMobile()) {
     buildSheet(r);
@@ -2140,6 +2207,10 @@ function openRubrique(idx) {
     blocks.push({ el: el, line: ln, offX: 0, offY: 0, w: 288, h: 120 });
   });
 
+  // Satellites de liens de la rubrique, s'il y en a : bâtis avant le placement,
+  // qui leur cherche une place dans la bande laissée libre par les cartes.
+  buildSats(r);
+
   // Le nœud actif finit toujours face caméra, donc au centre de l'écran :
   // on place les blocs autour de ce point d'arrivée, pas de sa position actuelle.
   layoutBlocks(window.innerWidth / 2, window.innerHeight / 2);
@@ -2161,7 +2232,8 @@ function closeRubrique() {
   // on le rend à l'entrée de la barre correspondante.
   var ae = document.activeElement;
   if (ae && ae !== document.body && !elDock.contains(ae) &&
-      (ae.id === 'close' || ae.className === 'more' || ae.className === 'backglobe')) {
+      (ae.id === 'close' || ae.className === 'more' || ae.className === 'backglobe' ||
+       elSats.contains(ae))) {
     try { navNodes[was].focus(); } catch (e) {}
   }
   elTitle.style.opacity = '0';
@@ -2169,12 +2241,17 @@ function closeRubrique() {
   elSheet.classList.remove('on');
   closeModal();
   blocks.forEach(function (b) { b.el.classList.remove('in'); b.el.style.transitionDelay = '0ms'; });
+  // Les satellites s'éteignent avec les cartes, puis quittent l'arbre : le
+  // calque ne doit pas garder de lien atteignable au clavier une fois fermé.
+  elSats.style.opacity = '0';
+  sats = [];
   var old = blocks.slice();
   setTimeout(function () {
     old.forEach(function (b) {
       if (b.el.parentNode) b.el.parentNode.removeChild(b.el);
       if (b.line.parentNode) b.line.parentNode.removeChild(b.line);
     });
+    if (state.active < 0) elSats.innerHTML = '';
   }, 400);
   blocks = [];
 }
@@ -2204,6 +2281,14 @@ function buildSheet(r) {
     }
     elSheet.appendChild(c);
   });
+  // Satellites de liens : en portrait il n'y a pas d'espace libre autour du
+  // nœud, ils reviennent donc en rangée au bas de la rubrique — posés à même
+  // la feuille, hors de toute carte, comme sur le globe.
+  if (r.sats) {
+    var sr = document.createElement('div');
+    sr.innerHTML = socialsHTML('row');
+    elSheet.appendChild(sr.firstChild);
+  }
   // Sortie explicite en bas de feuille : sur mobile la croix en haut à droite
   // est hors du pouce, et la barre de nœuds est masquée pendant la lecture.
   var row = document.createElement('div'); row.className = 'close-row';
@@ -2536,6 +2621,20 @@ function frame() {
       b.line.setAttribute('x2', tx); b.line.setAttribute('y2', ty);
       b.line.setAttribute('class', 'warm');
       b.line.style.opacity = behind ? '0' : '0.85';   // masqué si le nœud est caché
+    }
+
+    /* Satellites de liens : mêmes coordonnées d'ancrage que les cartes, mais
+       aucune ligne de liaison et aucun cadre — ils flottent, c'est tout. On
+       pose « left/top » et jamais « transform », que l'orbite occupe déjà. */
+    if (sats.length) {
+      for (var si = 0; si < sats.length; si++) {
+        var sa = sats[si];
+        var sx = Math.max(14, Math.min(W - 14 - SAT_R * 2, ax + sa.offX - SAT_R));
+        var sy = Math.max(14, Math.min(H - 14 - SAT_R * 2, ay + sa.offY - SAT_R));
+        sa.el.style.left = sx + 'px';
+        sa.el.style.top = sy + 'px';
+      }
+      elSats.style.opacity = behind ? '0.3' : '1';
     }
   }
 
