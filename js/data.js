@@ -106,22 +106,21 @@ function socialsHTML(variante) {
 var ROOTME = {
   pseudo: 'Nomalow',
   profil: 'https://www.root-me.org/Nomalow',
-  rang: 'Curieux',                 // champ « rang » de l'API : « curious »
+  rang: 'Curieux',
   challenges: 28,
   challengesTotal: 608,
   points: 335,
-  classement: 51444,
+  classement: 51423,
   maj: '2 septembre 2026',
-  sync: 'manuel',
-  // n = challenges validés dans la catégorie ; pct = part de la catégorie
-  // complétée, telle que Root-Me l'affiche sur la page publique. « pct » est
-  // facultatif : l'API ne l'expose pas sans parcourir les 608 challenges un à
-  // un, la synchronisation automatique ne le réécrit donc pas.
+  sync: 'auto',
+  // n = challenges validés dans la catégorie. Les catégories sont classées
+  // par nombre de validations décroissant et le nombre affiché est plafonné
+  // (voir MAX_CATS dans scripts/update-rootme.mjs).
   categories: [
-    { nom: 'Réseau',       n: 15, pct: 42 },
-    { nom: 'Web-Client',   n:  9, pct: 21 },
-    { nom: 'Web-Serveur',  n:  3, pct:  3 },
-    { nom: 'Cryptanalyse', n:  1, pct:  1 }
+    { nom: 'Réseau',       n: 15 },
+    { nom: 'Web-Client',   n:  9 },
+    { nom: 'Web-Serveur',  n:  3 },
+    { nom: 'Cryptanalyse', n:  1 }
   ]
 };
 /* @rootme:fin */
