@@ -103,6 +103,12 @@ les deux ensemble pour rester cohérent.
 
 - Les nœuds décoratifs secondaires se règlent dans `var SECONDAIRES` (nom, lat, lon),
   dans `js/data.js`.
+- La vitesse des transitions se règle en haut de `js/globe.js` :
+  `AIM_ROT_EASE` (rotation du globe vers la rubrique choisie) et `ZOOM_EASE`
+  (recadrage de la caméra). Ce sont des parts du chemin restant parcourues par
+  image : **plus la valeur est petite, plus la transition est lente.**
+  `ROT_EASE`, juste au-dessus, ne concerne que le glisser à la souris et n'a pas
+  de raison d'être ralenti.
 - La densité du globe se règle avec `var STEP = 1.0;` dans `buildDots()`
   (`js/globe.js`) : augmenter la valeur réduit le nombre de points (donc la charge
   GPU), la diminuer l'augmente. C'est le premier réglage à toucher sur une machine

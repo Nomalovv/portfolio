@@ -399,6 +399,138 @@ et en y sur huit images consécutives**. Les « chevauchements » observés avan
 cette correction se reproduisaient à l'identique sur la version d'avant
 découpage : c'étaient bien des mesures prises trop tôt, pas une régression.
 
+## Passe « arcs au-dessus du globe, transitions ralenties »
+
+Deux retours du propriétaire, traités l'un après l'autre.
+
+### 1. « Il y a des traits qui passent dans le globe et non au-dessus »
+
+C'était exact, et mesurable : **cinq des vingt et un arcs principaux
+traversaient réellement la sphère**.
+
+Les arcs étaient des Béziers quadratiques dont le point de contrôle était posé
+sur la **direction médiane** des deux extrémités, à `R·(1+h)`. Une Bézier ne
+passe pas par son point de contrôle : elle en reste à mi-chemin. Tant que les
+deux nœuds sont proches, la médiane pointe presque dans la même direction
+qu'eux et la courbe bombe correctement. Passé une centaine de degrés d'écart,
+la médiane s'écarte trop : la tangente au départ pointe vers **l'intérieur** du
+globe, et la courbe plonge sous la surface avant de ressortir. Rayon minimal
+mesuré sur la polyligne réellement rendue, surface = 1,000 R :
+
+```
+Paris–Wellington       0,849      (170,8° d'écart)
+Londres–Wellington     0,855      (169,2°)
+Reykjavik–Wellington   0,905      (155,2°)
+New York–Singapour     0,954      (137,9°)
+Wellington–New York    0,973      (129,5°)
+```
+
+Wellington est presque l'antipode de Paris et de Londres : pour ces deux
+paires, `a+b` est en outre quasi nul, et le `normalize()` du point de contrôle
+n'avait plus de direction stable à rendre. La sphère intérieure opaque
+(`R·0,9935`) masquait le plus gros du trajet enterré : ce qu'on voyait, c'était
+un trait qui rentre dans le globe d'un côté et ressort de l'autre — d'où le
+constat du propriétaire, et pourquoi il n'apparaissait que sous certains
+angles.
+
+Ce n'était donc **pas** un problème de `depthTest` / `depthWrite` /
+`renderOrder` : la profondeur faisait exactement son travail, elle cachait la
+partie enterrée. C'était une erreur de géométrie. La pile de profondeur est
+restée telle quelle (sphère intérieure opaque en `renderOrder -1`, arcs en
+additif `depthWrite:false` occultés par elle quand ils passent derrière).
+
+`makeArc()` trace maintenant le **grand cercle exact** entre les deux points,
+relevé par un profil en sinus :
+
+```
+rayon(t) = R · (ARC_ALT + h · sin(π·t))      ARC_ALT = 1,004
+point(t) = ( u·cos(ω·t) + perp·sin(ω·t) ) · rayon(t)
+```
+
+`u` et `perp` forment le repère orthonormé du plan du grand cercle, `ω` l'écart
+angulaire. Le rayon ne peut pas descendre sous `R·ARC_ALT` : **le survol est
+garanti par construction**, pas par un réglage à surveiller — c'est le point
+important, un simple « on augmente la hauteur » aurait laissé le défaut
+réapparaître au prochain déplacement de capitale. Deux détails qui comptent :
+
+- la hauteur du bombement suit désormais l'écart **angulaire**
+  (`h = 0,045 + 0,24·ω/π`) et non plus la corde, qui sature près de l'antipode
+  alors que c'est justement là que l'arc a le plus long chemin à survoler ;
+- le plan est choisi explicitement quand les deux points sont antipodaux, au
+  lieu de laisser une normalisation de vecteur nul décider.
+
+`arcCurve()` rend un objet minimal à `getPoint` / `getPoints` — les deux seules
+méthodes utilisées (géométrie de la ligne, et impulsions qui la parcourent dans
+`js/main.js`). Pas de sous-classe `THREE.Curve` : rien de nouveau à construire,
+et l'invariant « rien qui touche à `THREE` au premier niveau d'un fichier »
+reste vrai.
+
+À savoir pour la suite : le **maillage réseau flottant** (§ 2.4, 92 nœuds,
+`LineSegments` à `R·1,045`, opacité 0,032) trace lui aussi des traits en
+travers du disque du globe. Ils sont volontaires, et ils sont bien au-dessus de
+la surface (rayon minimal mesuré 1,027) : ce sont des cordes vues de face, pas
+des traits enterrés. À ne pas confondre avec le défaut corrigé ici.
+
+### 2. « Réduis la vitesse des transitions au moins de moitié »
+
+La rotation vers le nœud visé et le recadrage de la caméra étaient interpolés
+au même rythme que le geste direct. Ralentir le tout aurait rendu le glisser
+mou : le globe doit coller au doigt. Deux régimes sont donc distingués, et les
+coefficients sont sortis en constantes nommées en tête de `js/globe.js` :
+
+```
+ROT_EASE     = 0,10     glisser, molette, flèches — inchangé
+AIM_ROT_EASE = 0,045    transitions aimAt()       — 0,10 auparavant
+ZOOM_EASE    = 0,027    recadrage camZ            — 0,06 auparavant
+```
+
+`camZT` n'est touché que par `openRubrique()` et `closeRubrique()` : le zoom
+n'a pas besoin de condition, il est ralenti tout le temps. La rotation, si.
+`state.aim` marque la transition en cours : `aimAt()` le lève, la boucle de
+rendu le baisse à l'arrivée, et **tout geste direct le baisse aussi**
+(`pointerdown`, molette, flèches) pour que la reprise en main reste immédiate.
+
+Il suspend en outre la rotation d'ambiance et le balancement pendant la
+transition : ils déplacent la cible d'environ un cran par image, ce qui au
+régime lent empêchait purement et simplement la transition d'arriver (l'écart
+résiduel se stabilisait à `spin / ease`, vingt fois au-dessus du seuil
+d'arrivée). Effet de bord agréable : le globe ne dérive plus sous les doigts
+pendant qu'on parcourt la barre au clavier.
+
+### Vérifications de cette passe
+
+Navigateur headless (Edge Chromium piloté par puppeteer-core, WebGL logiciel),
+**en `file://` et sans `--allow-file-access-from-files`** : **39 vérifications
+passées, aucune erreur console**.
+
+- **Géométrie des arcs** — preuve, pas échantillon : pour les 58 arcs, le rayon
+  est relevé sur chaque sommet **et sur huit points par segment** (le trait
+  rendu est une corde, pas la courbe). Rayon minimal **1,00400**, zéro point
+  sous la surface. Comme le critère est un rayon dans le repère du globe, il ne
+  dépend pas de l'orientation : aucun angle ne peut le mettre en défaut.
+- **Six orientations** rejouées quand même (défaut, +90°, +180°, +270°,
+  plongée, contre-plongée), marge radiale minimale à l'écran 0,004 R à chaque
+  fois, captures à l'appui.
+- **Impulsions** : les 79 impulsions suivent `curve.getPoint()`, rayon minimal
+  1,00502.
+- **Transitions** : même trajet (Paris → Wellington, 170,8°, le plus long),
+  même point de départ, les deux régimes mesurés dans la même page —
+  70 images / 3 188 ms en 0,10 contre 158 images / 7 357 ms en 0,045, soit
+  **x2,26 en images et x2,31 en temps**. `state.aim` retombe bien à 0 sur
+  `pointerdown`.
+- **Non-régression** : 12 498 points en un seul `THREE.Points`, 21 arcs
+  principaux, 7 nœuds, sept ressources `file://` en 200 ; les sept rubriques
+  ouvertes une à une, nœud arrivé au centre, cartes sans contact entre elles ni
+  avec la barre, rien hors écran.
+
+Piège de méthode à ajouter aux précédents : **le harnais doit prévoir des
+délais plus longs**. L'attente de stabilisation (x ET y stables sur huit
+images) met maintenant jusqu'à ~7,5 s en rendu logiciel là où ~3 s
+suffisaient. Un harnais réglé sur les anciennes durées conclurait à une
+régression de placement des cartes alors qu'il mesure simplement en pleine
+transition — exactement le piège déjà rencontré à la passe précédente, avec un
+budget de temps deux fois plus grand.
+
 ## Où en est le projet — repères avant une grosse modification
 
 Section tenue à jour volontairement : elle décrit l'**état courant**, pas
@@ -407,7 +539,7 @@ avant de toucher quoi que ce soit, et à corriger en même temps que le code.
 
 ### Chiffres
 
-- 7 fichiers, ~125 Ko au total, three.js r128 chargé depuis cdnjs en script
+- 7 fichiers, ~130 Ko au total, three.js r128 chargé depuis cdnjs en script
   classique :
 
   ```
@@ -415,9 +547,9 @@ avant de toucher quoi que ce soit, et à corriger en même temps que le code.
   css/style.css     820 lignes    toute la mise en forme
   js/data.js        225 lignes    RUBRIQUES, SOCIAUX, SECONDAIRES, repli texte
   js/worldmap.js    220 lignes    contours, carte procédurale, textures
-  js/globe.js       488 lignes    scène three.js, nœuds, arcs, état
+  js/globe.js       561 lignes    scène three.js, nœuds, arcs, état, vitesses
   js/ui.js          507 lignes    barre, cartes, satellites, modale, mobile
-  js/main.js        469 lignes    amorçage, entrées, boucle de rendu
+  js/main.js        481 lignes    amorçage, entrées, boucle de rendu
   ```
 
 - 7 rubriques, 25 fiches de contenu, 20 nœuds décoratifs, 21 arcs principaux,
@@ -451,9 +583,10 @@ des dépendances :
    le contenu doit rester lisible.
 2. **`js/worldmap.js`** — `LAND`, `SEAS`, `buildWorldMap()`, `latLonToVec3()`,
    les trois fabriques de textures et `buildTextures()`.
-3. **`js/globe.js`** — l'objet `COL`, les objets de scène partagés, l'objet
-   `state`, `initGlobe()` (renderer, globe, points, halo, bokeh, nœuds, arcs,
-   impulsions), `aimAt()`, `projectNode()`.
+3. **`js/globe.js`** — l'objet `COL`, les objets de scène partagés, les
+   constantes de vitesse d'interpolation (`ROT_EASE`, `AIM_ROT_EASE`,
+   `ZOOM_EASE`), l'objet `state`, `initGlobe()` (renderer, globe, points, halo,
+   bokeh, nœuds, arcs, impulsions), `aimAt()`, `projectNode()`.
 4. **`js/ui.js`** — les références du document, `initUI()` (repères, barre de
    nœuds, pancartes, modale, croix), `announce()`, `syncDock()`, la modale,
    `layoutBlocks()` / `layoutSats()`, `openRubrique()` / `closeRubrique()`,
@@ -517,6 +650,17 @@ deux autres sont ceux qu'on oublie.
 
 - **Un seul draw call pour la carte du monde** (12 498 points dans un
   `THREE.Points`). Les arcs sont des objets séparés, c'est assumé.
+- **Aucun arc ne descend sous la surface du globe.** `makeArc()` trace un grand
+  cercle relevé par un profil en sinus : `rayon(t) = R·(1,004 + h·sin(πt))`, donc
+  jamais moins que `R·1,004`, quel que soit l'écart angulaire des deux points.
+  C'est garanti par la forme même de la courbe : ne pas revenir à une Bézier à
+  point de contrôle médian, elle plonge dans le globe passé ~100° d'écart.
+- **Deux régimes d'interpolation pour la rotation**, et c'est délibéré :
+  `ROT_EASE` (0,10) pour le geste direct, qui doit coller au doigt, et
+  `AIM_ROT_EASE` (0,045) pour les transitions `aimAt()`, ralenties à la demande
+  du propriétaire. `state.aim` fait le tri, et retombe à 0 au premier geste
+  direct. Il suspend aussi la rotation d'ambiance : sans cela, la cible avance
+  plus vite que l'interpolation lente et la transition n'arrive jamais.
 - **Aucune ressource externe hors CDN** : la carte du monde est générée sur un
   canvas, pas chargée — pas de `fetch`, pas d'image, donc pas de canvas *tainted*
   en `file://`.
@@ -570,6 +714,10 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
   `layoutBlocks()` repose sur cette hypothèse — puis **deux images** de plus :
   la condition d'arrivée peut être satisfaite par la position héritée de la
   rubrique précédente, toutes finissant centrées.
+- **Prévoir large sur cette attente : jusqu'à ~7,5 s en rendu logiciel** depuis
+  que les transitions `aimAt()` sont ralenties (~3 s auparavant). Un harnais
+  réglé sur les anciennes durées mesure en pleine transition et conclut à tort
+  à une régression de placement des cartes.
 - Mesurer des géométries (`getBoundingClientRect`) et des styles calculés, pas
   des captures : c'est ce qui attrape les chevauchements et les régressions de
   style. Les captures servent à juger la composition, pas à valider.
