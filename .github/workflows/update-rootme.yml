@@ -50,16 +50,16 @@ jobs:
 
     steps:
       - name: Récupérer le dépôt
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Historique complet : le « git pull --rebase » de la dernière étape
           # n'a pas de base commune exploitable sur un clone superficiel.
           fetch-depth: 0
 
       - name: Installer Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20' # fetch natif : le script n'a aucune dépendance
+          node-version: '22' # fetch natif : le script n'a aucune dépendance
 
       - name: Interroger l'API Root-Me et réécrire js/data.js
         env:
