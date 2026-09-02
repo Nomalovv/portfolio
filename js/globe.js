@@ -364,15 +364,65 @@ function initGlobe() {
     globe.add(pts);
   })();
 
-  /* --- 2.7 Arcs de Bézier quadratiques -------------------------------------- */
+  /* --- 2.7 Arcs : grand cercle relevé au-dessus de la surface ---------------- */
+
+  // Un arc doit TOUJOURS survoler le globe. La version précédente traçait une
+  // Bézier quadratique dont le point de contrôle était posé sur la direction
+  // médiane des deux extrémités : passé ~100° d'écart, la courbe part vers
+  // l'intérieur dès le départ et plonge sous la surface (rayon minimal mesuré :
+  // 0,849 R pour Paris–Wellington, 0,855 pour Londres–Wellington, 0,905 pour
+  // Reykjavik–Wellington, 0,954 pour New York–Singapour, 0,973 pour
+  // Wellington–New York) — cinq des vingt et un arcs principaux traversaient
+  // donc le globe au lieu de le survoler. Et deux points quasi antipodaux
+  // rendent `a+b` presque nul : `normalize()` y perdait toute direction stable.
+  //
+  // On trace maintenant le grand cercle exact entre les deux points, relevé par
+  // un profil en sinus : le rayon vaut R·(ARC_ALT + h·sin(πt)), donc jamais
+  // moins que R·ARC_ALT quel que soit l'écart angulaire. Le survol est garanti
+  // par construction, pas par un réglage à surveiller.
+  var ARC_ALT = 1.004;                             // altitude des deux extrémités
+
+  // Courbe minimale : `getPoint` / `getPoints` sont les deux seules méthodes
+  // utilisées (géométrie de la ligne, et impulsions qui la parcourent dans
+  // js/main.js). Pas de sous-classe THREE.Curve : rien à construire au premier
+  // niveau du fichier.
+  function arcCurve(u, perp, omega, h) {
+    return {
+      getPoint: function (t, target) {
+        var p = target || new THREE.Vector3();
+        var ca = Math.cos(omega * t), sa = Math.sin(omega * t);
+        var r = R * (ARC_ALT + h * Math.sin(Math.PI * t));
+        p.set((u.x * ca + perp.x * sa) * r,
+              (u.y * ca + perp.y * sa) * r,
+              (u.z * ca + perp.z * sa) * r);
+        return p;
+      },
+      getPoints: function (n) {
+        var out = [];
+        for (var i = 0; i <= n; i++) out.push(this.getPoint(i / n));
+        return out;
+      }
+    };
+  }
 
   function makeArc(a, b, main) {
-    var d = a.distanceTo(b);
-    var h = 0.10 + d * 0.30;                       // hauteur proportionnelle à la distance
-    var mid = a.clone().add(b).normalize().multiplyScalar(R * (1 + h));
-    var curve = new THREE.QuadraticBezierCurve3(
-      a.clone().normalize().multiplyScalar(R * 1.004), mid, b.clone().normalize().multiplyScalar(R * 1.004)
-    );
+    var u = a.clone().normalize();
+    var v = b.clone().normalize();
+    var cosO = Math.max(-1, Math.min(1, u.dot(v)));
+    var omega = Math.acos(cosO);
+    // Second vecteur du repère du plan du grand cercle. Deux points antipodaux
+    // n'en définissent aucun : on en choisit un stable plutôt que de laisser
+    // une normalisation de vecteur nul décider à notre place.
+    var perp = v.clone().addScaledVector(u, -cosO);
+    if (perp.lengthSq() < 1e-8) {
+      perp = (Math.abs(u.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).cross(u);
+    }
+    perp.normalize();
+    // Bombement proportionnel à l'écart ANGULAIRE, et non plus à la corde : la
+    // corde sature près de l'antipode alors que c'est justement là que l'arc a
+    // le plus long chemin à survoler.
+    var h = 0.045 + 0.24 * (omega / Math.PI);
+    var curve = arcCurve(u, perp, omega, h);
     var pts = curve.getPoints(main ? 72 : 40);
     var geo = new THREE.BufferGeometry().setFromPoints(pts);
     var mat = new THREE.LineBasicMaterial({
