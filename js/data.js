@@ -73,12 +73,10 @@ function socialsHTML(variante) {
 }
 
 /* --- 1.b Carte Root-Me (rubrique Certifications) ----------------------------
-   Chiffres RÉELS du profil public https://www.root-me.org/Nomalow, relevés le
-   2 septembre 2026 via l'API officielle (auteurs/1006965) et recoupés sur la
-   page publique. Ils ne sont PAS inventés, et ils ne sont PAS synchronisés en
-   direct — voir NOTES.md, section « Carte Root-Me », pour le détail de
-   l'enquête. En résumé, trois obstacles rendent un fetch() navigateur
-   impossible, en file:// comme en hébergement web :
+   Chiffres RÉELS du profil public https://www.root-me.org/Nomalow. Ils ne sont
+   PAS inventés, et ils ne sont PAS lus par la page : le site ne fait toujours
+   aucun appel réseau. Trois obstacles rendent un fetch() navigateur impossible,
+   en file:// comme en hébergement web (détail dans NOTES.md) :
 
      1. l'API exige une clé (401 sans elle sur tous les points d'entrée) ;
      2. cette clé se transmet dans l'en-tête « Cookie », que fetch() n'a pas le
@@ -88,11 +86,23 @@ function socialsHTML(variante) {
         préaffichage OPTIONS répond 404 : le navigateur bloque l'appel avant
         même de regarder la clé.
 
-   Et à supposer que tout cela marche, une clé personnelle posée dans un dépôt
-   public serait de toute façon lisible par n'importe qui. D'où le libellé
-   honnête « Relevé manuel du … » en bas de la carte : on n'annonce pas un
-   direct qui n'existe pas. Mettre à jour = corriger les nombres ci-dessous et
-   la date « maj ». */
+   Ces trois verrous sont des règles du NAVIGATEUR. Côté serveur elles
+   n'existent pas : les chiffres sont donc rafraîchis HORS LIGNE, par
+   scripts/update-rootme.mjs, lancé une fois par jour par le workflow GitHub
+   Actions .github/workflows/update-rootme.yml, qui réécrit le bloc ci-dessous
+   et le commite. La clé vit dans le secret ROOTME_API_KEY du dépôt, jamais
+   dans les fichiers.
+
+   « sync » dit ce qui est vrai en bas de la carte : « auto » = dernière valeur
+   posée par le script, « manuel » = relevé à la main. Tant que le secret n'est
+   pas configuré, le workflow échoue proprement et le bloc reste en l'état :
+   le site affiche les derniers chiffres commités, jamais des zéros.
+
+   Retouche à la main possible à tout moment (les nombres ET la date « maj ») ;
+   la prochaine synchronisation réussie reprendra la main. En revanche, tout ce
+   qui se trouve entre les deux marqueurs est REMPLACÉ intégralement par le
+   script : ne rien y ajouter qui doive survivre. */
+/* @rootme:début */
 var ROOTME = {
   pseudo: 'Nomalow',
   profil: 'https://www.root-me.org/Nomalow',
@@ -102,8 +112,11 @@ var ROOTME = {
   points: 335,
   classement: 51444,
   maj: '2 septembre 2026',
+  sync: 'manuel',
   // n = challenges validés dans la catégorie ; pct = part de la catégorie
-  // complétée, telle que Root-Me l'affiche sur la page publique.
+  // complétée, telle que Root-Me l'affiche sur la page publique. « pct » est
+  // facultatif : l'API ne l'expose pas sans parcourir les 608 challenges un à
+  // un, la synchronisation automatique ne le réécrit donc pas.
   categories: [
     { nom: 'Réseau',       n: 15, pct: 42 },
     { nom: 'Web-Client',   n:  9, pct: 21 },
@@ -111,11 +124,20 @@ var ROOTME = {
     { nom: 'Cryptanalyse', n:  1, pct:  1 }
   ]
 };
+/* @rootme:fin */
 
 /* Espace fine insécable dans les milliers : « 51 444 » ne doit jamais être
    coupé en fin de ligne au milieu d'un nombre. */
 function fmtMilliers(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+/* Les valeurs de ROOTME sont désormais écrites par un script à partir d'une
+   réponse d'API : elles sont échappées avant d'entrer dans du HTML, plutôt que
+   de faire confiance à un tiers sur la forme d'un nom de rubrique. */
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /* Rend la carte Root-Me. Renvoie du HTML posé tel quel dans le champ « d »
@@ -124,6 +146,7 @@ function fmtMilliers(n) {
    Le glyphe est un dessin maison (invite de terminal), pas le logo déposé de
    Root-Me : aucune ressource externe n'est chargée, invariant du site. */
 function rootmeHTML() {
+  var auto = ROOTME.sync === 'auto';
   var max = ROOTME.categories.reduce(function (m, c) { return Math.max(m, c.n); }, 1);
   var tuiles = [
     { v: fmtMilliers(ROOTME.challenges), l: 'Challenges résolus' },
@@ -139,9 +162,9 @@ function rootmeHTML() {
           '<path class="g" d="M12.4 15.4h4.7"/>' +
         '</svg>' +
       '</span>' +
-      '<span class="rm-id">root-me.org<br>rang « ' + ROOTME.rang + ' »</span>' +
-      '<a class="rm-link" href="' + ROOTME.profil + '" target="_blank" rel="noopener noreferrer"' +
-        ' aria-label="Profil public Root-Me de ' + ROOTME.pseudo + ' (nouvel onglet)">' +
+      '<span class="rm-id">root-me.org<br>rang « ' + esc(ROOTME.rang) + ' »</span>' +
+      '<a class="rm-link" href="' + esc(ROOTME.profil) + '" target="_blank" rel="noopener noreferrer"' +
+        ' aria-label="Profil public Root-Me de ' + esc(ROOTME.pseudo) + ' (nouvel onglet)">' +
         'Profil public<span aria-hidden="true"> ↗</span></a>' +
     '</div>' +
     '<ul class="rm-stats">' + tuiles.map(function (t) {
@@ -156,16 +179,27 @@ function rootmeHTML() {
       // plancher de 7 % garde la barre lisible quand la valeur vaut 1.
       var w = Math.max(7, Math.round(c.n / max * 100));
       var s = c.n > 1 ? 's' : '';
-      return '<li title="' + c.nom + ' : ' + c.n + ' challenge' + s + ' validé' + s + ', ' +
-             c.pct + ' % de la catégorie">' +
-             '<span class="rm-cat">' + c.nom + '</span>' +
+      // « pct » est facultatif : la synchronisation automatique ne sait pas le
+      // calculer (l'API ne donne pas le nombre total de challenges par rubrique).
+      // Sans lui, l'infobulle se contente du nombre de validations.
+      var part = (c.pct == null) ? '' : ', ' + c.pct + ' % de la catégorie';
+      return '<li title="' + esc(c.nom) + ' : ' + c.n + ' challenge' + s + ' validé' + s + part + '">' +
+             '<span class="rm-cat">' + esc(c.nom) + '</span>' +
              '<span class="rm-bar" aria-hidden="true"><i style="width:' + w + '%"></i></span>' +
              '<span class="rm-n">' + c.n + '</span></li>';
     }).join('') + '</ul>' +
     // « div » et non « p » : « .block p », « #sheet .card p » et « #fatal.doc p »
     // fixent chacun une taille de texte, et l'emporteraient sur la nôtre.
-    '<div class="rm-sync"><span class="rm-dot" aria-hidden="true"></span>' +
-      'Relevé manuel du ' + ROOTME.maj + '</div>' +
+    // Le libellé dit ce qui est vrai, et rien de plus : « auto » seulement une
+    // fois que scripts/update-rootme.mjs a réellement écrit ces chiffres. Il est
+    // tenu court — la ligne fait 9,5 px de monospace dans une carte de 252 px de
+    // contenu, soit ~41 signes avant de passer sur deux lignes et de faire
+    // grandir la plus haute carte du site ; la phrase entière part dans « title ».
+    '<div class="rm-sync" title="' + (auto
+      ? 'Chiffres synchronisés automatiquement depuis l’API Root-Me par GitHub Actions ; date de la dernière évolution constatée.'
+      : 'Chiffres relevés à la main sur le profil public, à cette date.') + '">' +
+      '<span class="rm-dot" aria-hidden="true"></span>' +
+      (auto ? 'Synchro. auto. du ' : 'Relevé manuel du ') + esc(ROOTME.maj) + '</div>' +
   '</div>';
 }
 

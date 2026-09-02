@@ -1,0 +1,88 @@
+# =============================================================================
+# Synchronisation automatique des statistiques Root-Me
+#
+# Ce que fait ce workflow : appeler l'API Root-Me depuis un runner (côté
+# serveur, donc SANS les deux verrous du navigateur — en-tête « Cookie »
+# interdit et absence de CORS, voir NOTES.md), réécrire le bloc ROOTME de
+# js/data.js, et commiter le résultat si un chiffre a bougé.
+#
+# Le site lui-même ne change pas de nature : il continue de ne lire que des
+# fichiers statiques et s'ouvre toujours en double-cliquant sur index.html.
+#
+# PRÉREQUIS — un secret à créer une fois par le propriétaire du dépôt :
+#   Settings → Secrets and variables → Actions → New repository secret
+#   Nom exact : ROOTME_API_KEY     Valeur : la clé d'API du compte Root-Me
+#   (Root-Me → connecté → « Mon compte » / profil → section clé d'API.)
+# Tant que ce secret n'existe pas, chaque exécution échoue proprement, ne
+# commite rien, et le site continue d'afficher les derniers chiffres commités.
+#
+# TEST MANUEL : onglet « Actions » → « Stats Root-Me » → « Run workflow ».
+# =============================================================================
+name: Stats Root-Me
+
+on:
+  schedule:
+    # Tous les jours à 06:00 UTC (08:00 à Paris en été, 07:00 en hiver ;
+    # GitHub ne connaît que l'UTC). Format : minute heure jour mois jour-semaine.
+    # Ajustable librement — « 0 4 * * 1 » = tous les lundis à 04:00 UTC.
+    # À savoir : GitHub met les tâches planifiées en file d'attente aux heures
+    # de pointe, un retard de quelques dizaines de minutes est normal, et le
+    # planificateur est désactivé après 60 jours sans activité sur le dépôt.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+# Le seul droit nécessaire : réécrire js/data.js sur main avec le GITHUB_TOKEN
+# intégré. Aucun jeton personnel, aucune clé dans le dépôt.
+permissions:
+  contents: write
+
+# Deux exécutions simultanées (planifiée + manuelle) pousseraient sur la même
+# branche : la seconde attend plutôt que d'entrer en conflit.
+concurrency:
+  group: stats-rootme
+  cancel-in-progress: false
+
+jobs:
+  synchroniser:
+    name: Interroger l'API et commiter si besoin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          # Historique complet : le « git pull --rebase » de la dernière étape
+          # n'a pas de base commune exploitable sur un clone superficiel.
+          fetch-depth: 0
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # fetch natif : le script n'a aucune dépendance
+
+      - name: Interroger l'API Root-Me et réécrire js/data.js
+        env:
+          ROOTME_API_KEY: ${{ secrets.ROOTME_API_KEY }}
+        run: node scripts/update-rootme.mjs
+
+      # Filet : un js/data.js cassé casserait le site en entier. Le script
+      # analyse déjà ce qu'il écrit, on revérifie le fichier tel qu'il est
+      # réellement sur le disque avant d'en faire un commit.
+      - name: Vérifier que js/data.js s'analyse toujours
+        run: node --check js/data.js
+
+      - name: Commiter et pousser si les chiffres ont changé
+        run: |
+          if git diff --quiet -- js/data.js; then
+            echo "Chiffres inchangés : aucun commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/data.js
+          git commit -m "Mise à jour automatique des stats Root-Me"
+          # Le dépôt se pousse directement sur main (pas de branche, pas de PR).
+          # Le rebase couvre le cas où main a bougé pendant l'exécution.
+          git pull --rebase origin main
+          git push origin HEAD:main
