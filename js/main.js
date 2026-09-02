@@ -70,10 +70,13 @@ function frame() {
   /* --- interpolations continues : jamais de saut brutal --- */
   state.p += (state.pT - state.p) * 0.075;
   state.dim += (state.dimT - state.dim) * 0.08;
-  state.camZ += (state.camZT - state.camZ) * 0.06;
+  state.camZ += (state.camZT - state.camZ) * ZOOM_EASE;
   camera.position.z = state.camZ;
 
-  if (state.active < 0 && !drag) {
+  // Pendant une transition aimAt(), la rotation d'ambiance et le balancement
+  // sont suspendus : ils déplacent la cible d'environ un cran par image, ce qui
+  // au régime lent empêcherait la transition d'arriver.
+  if (state.active < 0 && !drag && !state.aim) {
     state.rotYT += state.spin;
     if (!REDUCED) state.rotXT = 0.12 + Math.sin(t * 0.22) * 0.075;   // léger balancement
   }
@@ -84,8 +87,15 @@ function frame() {
     if (Math.abs(state.velY) < 1e-5) state.velY = 0;
     if (Math.abs(state.velX) < 1e-5) state.velX = 0;
   }
-  state.rotY += (state.rotYT - state.rotY) * 0.10;
-  state.rotX += (state.rotXT - state.rotX) * 0.10;
+  // Transition de rubrique : régime lent. Geste direct : régime nerveux.
+  var rotEase = state.aim ? AIM_ROT_EASE : ROT_EASE;
+  state.rotY += (state.rotYT - state.rotY) * rotEase;
+  state.rotX += (state.rotXT - state.rotX) * rotEase;
+  if (state.aim &&
+      Math.abs(state.rotYT - state.rotY) < 0.0015 &&
+      Math.abs(state.rotXT - state.rotX) < 0.0015) {
+    state.aim = 0;                                  // arrivé : on rend la main
+  }
   globe.rotation.y = state.rotY;
   globe.rotation.x = state.rotX;
 
@@ -361,6 +371,7 @@ function initInteractions() {
       state.pT = Math.min(1, Math.max(0, state.pT + d / 900));
       state.upAccum = 0;
     } else {
+      state.aim = 0;                             // geste direct : reprise du régime nerveux
       state.velY += d * 0.00022;
       if (state.active < 0) {
         if (d < 0) state.upAccum -= d; else state.upAccum = Math.max(0, state.upAccum - d * 0.6);
@@ -373,6 +384,7 @@ function initInteractions() {
     drag = true; moved = 0; downT = performance.now();
     lastX = e.clientX; lastY = e.clientY;
     state.velY = 0; state.velX = 0;
+    state.aim = 0;                               // le doigt reprend la main sur la caméra
     if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (x) {} }
   });
 
@@ -404,8 +416,8 @@ function initInteractions() {
       if (state.active >= 0) { closeRubrique(); return; }
       if (state.pT > 0.5) { state.pT = 0; return; }
     }
-    if (e.key === 'ArrowLeft')  { state.pT = 1; state.rotYT -= 0.22; }
-    if (e.key === 'ArrowRight') { state.pT = 1; state.rotYT += 0.22; }
+    if (e.key === 'ArrowLeft')  { state.pT = 1; state.rotYT -= 0.22; state.aim = 0; }
+    if (e.key === 'ArrowRight') { state.pT = 1; state.rotYT += 0.22; state.aim = 0; }
   });
 
   /* Entrée dans le globe : bouton explicite de l'accueil. Le scroll et le

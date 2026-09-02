@@ -30,6 +30,23 @@ var tmpV = null, normal = null, toCam = null, centerW = null, tmpP = null;
 /* ============================================================================
    1. ÉTAT D'INTERACTION
    ========================================================================== */
+
+/* Vitesses d'interpolation, relues par la boucle de rendu de js/main.js.
+   Toutes sont des coefficients « part du chemin restant parcourue par image ».
+
+   Deux régimes distincts pour la rotation, et c'est délibéré :
+   - ROT_EASE sert au geste direct (glisser, molette, flèches). Le globe doit
+     coller au doigt : le ralentir rendrait la manipulation molle.
+   - AIM_ROT_EASE sert aux transitions déclenchées par aimAt(), c'est-à-dire au
+     changement de rubrique depuis la barre de nœuds ou au clic sur un nœud.
+     Le propriétaire les trouvait trop rapides : elles durent maintenant plus du
+     double (constante de temps 0,10 -> 21,7 images contre 9,5, soit x2,3).
+   Le recadrage de la caméra (camZ), lui, n'est déclenché QUE par l'ouverture et
+   la fermeture d'une rubrique : il est ralenti sans condition. */
+var ROT_EASE     = 0.10;
+var AIM_ROT_EASE = 0.045;   // transitions aimAt() : au moins deux fois plus lentes
+var ZOOM_EASE    = 0.027;   // était 0,06 — ouverture / fermeture d'une rubrique
+
 var state = {
   p: 0, pT: 0,             // progression accueil -> plein écran
   rotY: 0.35, rotYT: 0.35,
@@ -41,6 +58,7 @@ var state = {
   hovered: -1,
   focused: -1,
   dim: 0, dimT: 0,
+  aim: 0,                  // 1 tant qu'une transition aimAt() n'est pas arrivée
   upAccum: 0
 };
 
@@ -512,6 +530,10 @@ function initGlobe() {
    3. ROTATION VERS UN POINT
    ========================================================================== */
 // Amène le point local p face à la caméra (+Z). Ordre d'Euler XYZ => M = Rx·Ry.
+// `state.aim` fait passer la boucle de rendu en régime lent (AIM_ROT_EASE) et
+// suspend la rotation d'ambiance, qui sinon empêcherait la transition de se
+// terminer ; il est levé par la boucle à l'arrivée, ou par le premier geste
+// direct de l'utilisateur (voir js/main.js).
 function aimAt(local) {
   var L = Math.sqrt(local.x * local.x + local.z * local.z);
   var ry = Math.atan2(-local.x, local.z);
@@ -522,6 +544,7 @@ function aimAt(local) {
   state.rotYT += d;
   state.rotXT = rx;
   state.velY = 0; state.velX = 0;
+  state.aim = 1;
 }
 
 /* ============================================================================
