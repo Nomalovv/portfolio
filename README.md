@@ -145,7 +145,11 @@ scripts/update-rootme.mjs             le script (Node 18+, aucune dépendance)
 .github/workflows/update-rootme.yml   la tâche planifiée qui le lance
 ```
 
-### À faire une fois : ajouter la clé d'API
+### La clé d'API — déjà en place
+
+> **C'est déjà fait** : le secret `ROOTME_API_KEY` existe sur le dépôt et deux
+> exécutions sont passées. Ce qui suit sert à le refaire le jour où la clé
+> expire, ou à remonter le mécanisme ailleurs.
 
 Sans cette clé, rien ne peut fonctionner — et **tant qu'elle n'est pas là, la
 tâche échoue proprement à chaque exécution sans rien casser** : aucun commit

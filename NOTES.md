@@ -808,15 +808,34 @@ catégorie » ; `sync:'auto'` sans `pct` → « Synchro. auto. du 2 septembre 20
 (34 signes) et infobulle « Réseau : 15 challenges validés ». Quatre lignes de
 catégories dans les deux cas.
 
-Ce qui n'a **pas** pu être vérifié, et qu'il faut savoir : le script n'a jamais
-été confronté à la vraie API — la clé appartient au propriétaire et n'a pas à
-transiter par ici. Les noms de champs (`score`, `position`, `rang`,
-`validations`, `rubrique`) viennent du relevé de la passe précédente ; le nom du
-paramètre de pagination (`debut_validations`) et la table de traduction des
-rangs sont, eux, des hypothèses. Les deux dégradent proprement : une pagination
-qui ne répond pas laisse la première page, un rang inconnu est **recopié tel
-quel** plutôt que traduit à tort. Le premier `Run workflow` manuel est donc le
-vrai test — et il ne peut pas abîmer le fichier, par construction.
+### Et l'essai réel, qui a tranché deux hypothèses
+
+Le secret `ROOTME_API_KEY` étant déjà en place, la tâche a été lancée pour de
+vrai. **Deux exécutions vertes**, et elles ont appris trois choses qu'aucun
+bouchon ne pouvait dire :
+
+1. **Les validations ne portent pas leur rubrique.** Le chemin de secours —
+   28 appels `/challenges/{id}` par lots de 4 — n'est donc pas une précaution
+   théorique : c'est le chemin **normal**. Une exécution prend ~65 s, dont
+   l'essentiel dans ces appels. C'est aussi ce qui borne la fréquence : un cron
+   plus serré qu'une fois par jour marterait l'API sans rien apprendre.
+2. **Le rang revient bien en anglais** et la table le traduit : la carte affiche
+   « Curieux ».
+3. **Les chiffres bougent vraiment** — le classement mondial est passé de
+   51 444 à **51 423** entre le relevé manuel du matin et l'essai, à points
+   constants. C'est précisément ce qu'une synchronisation quotidienne rattrape,
+   et un relevé manuel jamais.
+
+La **seconde** exécution a répondu « Chiffres inchangés : aucun commit » : la
+détection de non-changement fonctionne sur des données réelles, pas seulement
+sur le bouchon. Reste non éprouvé, faute de matière : la **pagination** des
+validations (28 < une page) et la traduction des rangs autres que `curious`.
+Les deux dégradent proprement — une pagination muette laisse la première page,
+un rang inconnu est **recopié tel quel** plutôt que traduit à tort.
+
+Un détail relevé à l'essai : `actions/checkout@v4` et `setup-node@v4` tournent
+sur un runtime Node 20 déprécié, que GitHub force déjà sur Node 24. Passés en
+v5 (`using: node24`, `fetch-depth` conservé), et le script en Node 22.
 
 ## Où en est le projet — repères avant une grosse modification
 
@@ -1052,18 +1071,17 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
   Root-Me, elle, est écrite), et les lectures longues (`long`) sont à ajouter là
   où elles ont un sens — c'est ce qui réveillera le bouton « Voir en détail » et
   la modale.
-- **Pages GitHub** : la mise en ligne n'est pas encore configurée. À noter : ce
-  n'est **pas** ce qui débloquerait un direct Root-Me — l'API n'envoie aucun
-  en-tête CORS, l'origine `https://nomalovv.github.io` est refusée exactement
-  comme `file://`.
-- **Ajouter le secret `ROOTME_API_KEY`** (à faire par le propriétaire, une
-  seule fois) : `Settings` → `Secrets and variables` → `Actions` →
-  `New repository secret`, nom exact `ROOTME_API_KEY`, valeur = la clé d'API du
-  compte Root-Me. Tant qu'il manque, la tâche planifiée échoue **proprement** à
-  chaque exécution : aucun commit, `js/data.js` intact, site inchangé. Une fois
-  le secret posé, `Actions` → `Stats Root-Me` → `Run workflow` fait le premier
-  essai. Un rafraîchissement à la main de l'objet `ROOTME` reste possible en
-  attendant, et à tout moment ensuite.
+- **Pages GitHub** : en service, sur `main` / racine —
+  <https://nomalovv.github.io/portfolio/>. À noter : ce n'est **pas** ce qui
+  débloquerait un direct Root-Me — l'API n'envoie aucun en-tête CORS, l'origine
+  `https://nomalovv.github.io` est refusée exactement comme `file://`.
+- **Synchronisation Root-Me : rien à faire, elle tourne.** Le secret
+  `ROOTME_API_KEY` est en place et deux exécutions sont passées. Pour la
+  relancer à la main : `Actions` → `Stats Root-Me` → `Run workflow`. Si elle se
+  met un jour à échouer sur « L'API a refusé la clé (HTTP 401) », c'est que la
+  clé a expiré : la régénérer sur Root-Me et remplacer le secret dans
+  `Settings` → `Secrets and variables` → `Actions`. Un rafraîchissement à la
+  main de l'objet `ROOTME` reste possible à tout moment.
 
 ## Limites connues / à savoir
 
