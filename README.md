@@ -73,6 +73,24 @@ endroit à toucher pour changer les textes. Une rubrique = un objet :
 `lat` / `lon` déplacent le nœud sur le globe. Comptez 3 ou 4 blocs par rubrique :
 au-delà, le placement anti-chevauchement manque de place sur petit écran.
 
+### 1 bis. Les chiffres Root-Me — `var ROOTME` dans `js/data.js`
+
+La carte Root-Me de la rubrique Certifications (section « 1.b ») affiche les
+statistiques réelles du profil public : challenges validés, points, classement
+mondial et validations par catégorie.
+
+Ces chiffres sont un **relevé daté**, pas un flux : l'API Root-Me exige une clé
+personnelle transmise dans un en-tête `Cookie`, que le JavaScript d'une page n'a
+pas le droit de poser, et elle n'envoie aucun en-tête CORS — un appel depuis le
+navigateur est refusé, aussi bien en `file://` qu'une fois le site en ligne.
+C'est pourquoi la carte affiche honnêtement « Relevé manuel du … » plutôt qu'un
+faux direct.
+
+Pour les rafraîchir : relever les valeurs sur <https://www.root-me.org/Nomalow>
+et corriger l'objet `ROOTME` — les nombres **et** le champ `maj` (la date
+affichée en bas de la carte). Rien d'autre à toucher : la carte se redessine
+toute seule dans les trois rendus du site.
+
 ### 2. Les liens LinkedIn / GitHub / courriel — `var SOCIAUX` dans `js/data.js`
 
 Juste au-dessus de `RUBRIQUES` (section « 1.a »). Une entrée = un lien, avec son
@@ -98,6 +116,10 @@ tout en haut de la feuille de style. Les couleurs 3D correspondantes (points de
 terre, arcs, nœuds) sont dans l'objet `COL`, en haut de `js/globe.js` (il est
 rempli au démarrage, `THREE.Color` ayant besoin de la bibliothèque) — modifiez
 les deux ensemble pour rester cohérent.
+
+Trois variables font exception : `--rm`, `--rm-soft` et `--rm-brd`, le rouge de
+Root-Me. Elles ne servent qu'à la carte Root-Me, volontairement traitée dans la
+couleur du service dont elle parle, et n'ont pas à suivre l'accent du site.
 
 ## Bon à savoir
 

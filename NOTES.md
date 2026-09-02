@@ -531,6 +531,143 @@ régression de placement des cartes alors qu'il mesure simplement en pleine
 transition — exactement le piège déjà rencontré à la passe précédente, avec un
 budget de temps deux fois plus grand.
 
+## Passe « carte Root-Me » — le direct n'était pas possible, et pourquoi
+
+Demande du propriétaire : une carte Root-Me dans la rubrique Certifications,
+avec ses vraies statistiques, **synchronisées en direct par l'API**. La faisa-
+bilité a été instruite avant d'écrire la moindre ligne de code produit, parce
+que la réponse changeait complètement l'implémentation.
+
+### Ce que l'enquête a trouvé
+
+Quatre obstacles, chacun suffisant à lui seul, mesurés par requête réelle et
+non déduits d'une documentation :
+
+1. **`api.root-me.org` n'existe plus.** L'hôte résout, mais la poignée de main
+   TLS échoue en `unrecognized_name` (alerte 112) : plus de certificat pour ce
+   nom. Le point d'entrée officiel est **`api.www.root-me.org`**.
+2. **Une clé est strictement obligatoire.** Tous les points d'entrée répondent
+   `401 {"error":{"code":401}}` sans elle. Aucun profil public par l'API.
+3. **La clé se transmet dans l'en-tête `Cookie`** (`Cookie: api_key=…`), et
+   uniquement là : en paramètre d'URL (`?apikey=`) comme en en-tête maison
+   (`api_key:`), la réponse reste 401. Or `Cookie` est un **nom d'en-tête
+   interdit** : `fetch()` n'a pas le droit de le poser. Même avec la clé en
+   main, le navigateur ne peut pas s'authentifier.
+4. **Aucun en-tête CORS, nulle part.** Pas d'`Access-Control-Allow-Origin` sur
+   la moindre réponse, testée avec `Origin: https://nomalovv.github.io` **et**
+   `Origin: null` (le cas `file://`) ; le préaffichage `OPTIONS` répond 404,
+   sans en-tête non plus. Le navigateur bloque donc l'appel avant même de
+   regarder la clé — **en `file://` comme sur GitHub Pages**. Ce n'est pas une
+   limite de l'ouverture par double-clic : la mise en ligne n'y changerait
+   rien.
+
+La page publique `https://www.root-me.org/Nomalow` n'est pas une porte de
+secours non plus : elle est derrière **Anubis**, un rempart anti-robot à preuve
+de travail en JavaScript, et ne renvoie pas davantage d'en-têtes CORS. Elle est
+lisible depuis un script (le défi se résout : `sha256` du champ `challenge`,
+puis `pass-challenge` rend le cookie d'authentification), mais jamais depuis
+une page tierce dans un navigateur.
+
+S'ajoute un argument qui vaut à lui seul : une clé personnelle posée dans le JS
+d'un **dépôt public** est lisible par n'importe qui. Même si les quatre points
+ci-dessus tombaient un jour, ce ne serait pas la bonne façon de le faire — il
+faudrait un petit relais côté serveur, qui garde la clé et ajoute les en-têtes
+CORS. Hors de portée d'un site qui doit s'ouvrir en double-cliquant.
+
+### Ce qui a donc été fait
+
+Les chiffres sont **relevés une fois, réels, et datés**. Ils viennent de l'API
+officielle (`auteurs/1006965`, avec la clé fournie par le propriétaire, qui
+n'est **pas** stockée dans le dépôt) et sont recoupés sur la page publique.
+Relevé du 2 septembre 2026 : **28 challenges validés sur 608, 335 points,
+51 444ᵉ mondial, rang « curious »**, répartis en Réseau 15, Web-Client 9,
+Web-Serveur 3, Cryptanalyse 1.
+
+La ligne de statut dit donc « **Relevé manuel du 2 septembre 2026** » et non
+« synchronisé en direct ». C'est le point qui compte : afficher un faux direct
+aurait été pire que pas de carte du tout. Mettre à jour = corriger l'objet
+`ROOTME` en tête de `js/data.js` (les nombres **et** la date `maj`).
+
+### Comment la carte est branchée
+
+Elle n'a demandé **aucune modification de `js/ui.js`**, et c'est délibéré : le
+modèle de données offrait déjà le bon crochet. La carte est un bloc ordinaire
+de `RUBRIQUES` avec `d: rootmeHTML()` et `html:true` — donc rendue à
+l'identique par les **trois** chemins du site (cartes en orbite, feuille
+mobile, repli texte), sans une ligne en double. Elle remplace le bloc
+placeholder « Pratique régulière » plutôt que de s'ajouter : la rubrique reste
+à quatre fiches, la limite au-delà de laquelle le placement manque de place.
+
+Le glyphe est un dessin maison (invite de terminal), pas le logo déposé de
+Root-Me : aucune ressource externe, invariant du site.
+
+### Le rouge, exception de marque assumée
+
+Trois variables nouvelles dans `:root` — `--rm`, `--rm-soft`, `--rm-brd` — et
+elles ne servent qu'à cette carte. La rupture avec l'accent cyan est voulue :
+cette fiche parle d'un service tiers, et le rouge est sa couleur. `--rm-soft`
+(`#ff9a9d`) est la seule des trois à porter du texte, à 8,9:1 sur la vitre des
+cartes.
+
+### Quatre défauts trouvés au test, tous invisibles à la relecture
+
+Les trois premiers sont la même erreur sous trois formes : **les conteneurs
+`.data` des trois rendus imposent des styles qui l'emportent en spécificité sur
+ceux de la carte.** C'est le piège à retenir pour tout futur bloc `html:true`.
+
+1. **`overflow-wrap:anywhere`**, hérité des trois conteneurs `.data` (il y sert
+   aux longues lignes de données monospace), coupait **« #51 444 » en plein
+   milieu d'un nombre**, sur deux lignes. La carte remet la césure normale.
+2. **`.block p` (0,1,1) l'emportait sur `.rm-sync` (0,1,0)** : la ligne de
+   statut s'affichait en 13,4 px au lieu de 9,5 px et passait sur deux lignes.
+   Corrigé en la rendant en `div` plutôt qu'en `p` — plutôt que d'ouvrir une
+   guerre de spécificité qu'il aurait fallu regagner trois fois (`.block p`,
+   `#sheet .card p`, `#fatal.doc p`). Même raison pour le `div` du repli texte :
+   `renderFallbackDoc()` posait le HTML dans un `<p>`, imbrication invalide dès
+   que le contenu est un bloc.
+3. **`.block a` (0,1,1), `#sheet a` (1,0,1) et `#fatal.doc a` (1,1,1)** repas-
+   saient le bouton « Profil public » à l'accent **cyan**, souligné — ce qui
+   annulait toute l'exception de marque. Repris une fois pour les trois par
+   `.block .rm-link, #sheet .rm-link, #fatal.doc .rm-link`, qui gagne partout.
+4. **Une tuile ne fait que 79 px.** Même sans césure sauvage, « #51 444 » à
+   19 px n'y tenait pas. `rootmeHTML()` pose une classe `tight` (15 px) au-delà
+   de cinq caractères, plutôt qu'une règle sur `:nth-child(3)` qui casserait au
+   premier réordonnancement.
+
+### Vérifications de cette passe
+
+Navigateur headless (Edge Chromium piloté par puppeteer-core, WebGL logiciel),
+en `file://` : **321 vérifications passées, aucune erreur console, aucune
+ressource `file://` en échec.**
+
+- Les neuf tailles desktop habituelles (1920×1080 à 821×640) : carte rendue,
+  trois tuiles aux **vrais** chiffres, quatre barres remplies proportionnelle-
+  ment et jamais débordantes, chaque nombre sur **une** ligne et dans sa tuile,
+  lien `target="_blank"` + `rel="noopener noreferrer"` + `aria-label`, bouton en
+  rouge de marque (`rgb(255,154,157)`, la non-régression du défaut 3), point de
+  statut rouge, libellé sans le mot « direct », largeur du widget contenue dans
+  la carte.
+- **Invariant de chevauchement rejoué à chaque taille** avec la nouvelle carte,
+  bien plus haute que les autres (352 px contre ~120) : quatre cartes dans
+  l'écran, aucun contact entre elles, aucune sur la barre de nœuds. La
+  répartition équilibrée de `layoutBlocks()` fait son travail sans réglage.
+- Feuille mobile 375×780 : cible tactile du lien à 44 px, aucun débordement
+  horizontal, pas de soulignement cyan hérité, chiffres identiques.
+- Repli sans three.js : 7 sections, 25 fiches, carte présente, widget dans un
+  `div` et non un `p` (défaut 2), lien et chiffres identiques.
+- `prefers-reduced-motion` : carte rendue, **aucune** animation dans son
+  sous-arbre.
+- Non-régression : 12 498 points en un seul `THREE.Points`, 7 rubriques,
+  7 entrées de barre, lien atteignable au clavier.
+
+Piège de méthode à ajouter aux précédents, rencontré en écrivant le harnais :
+**une entrée de la barre est un interrupteur.** Un harnais qui la clique à
+chaque taille ouvre, ferme, ouvre… et une itération sur deux mesure une page
+sans cartes. Il faut tester `state.active` avant de cliquer. Et pour la feuille
+mobile, l'inverse : elle n'est bâtie qu'à l'**ouverture**, donc il faut
+`closeRubrique()` d'abord si la rubrique était restée ouverte du parcours
+desktop, sinon rien n'est reconstruit.
+
 ## Où en est le projet — repères avant une grosse modification
 
 Section tenue à jour volontairement : elle décrit l'**état courant**, pas
@@ -539,13 +676,13 @@ avant de toucher quoi que ce soit, et à corriger en même temps que le code.
 
 ### Chiffres
 
-- 7 fichiers, ~130 Ko au total, three.js r128 chargé depuis cdnjs en script
+- 7 fichiers, ~138 Ko au total, three.js r128 chargé depuis cdnjs en script
   classique :
 
   ```
   index.html         75 lignes    squelette + appels des feuilles et scripts
-  css/style.css     820 lignes    toute la mise en forme
-  js/data.js        225 lignes    RUBRIQUES, SOCIAUX, SECONDAIRES, repli texte
+  css/style.css     969 lignes    toute la mise en forme
+  js/data.js        331 lignes    RUBRIQUES, SOCIAUX, ROOTME, SECONDAIRES, repli
   js/worldmap.js    220 lignes    contours, carte procédurale, textures
   js/globe.js       561 lignes    scène three.js, nœuds, arcs, état, vitesses
   js/ui.js          507 lignes    barre, cartes, satellites, modale, mobile
@@ -554,18 +691,22 @@ avant de toucher quoi que ce soit, et à corriger en même temps que le code.
 
 - 7 rubriques, 25 fiches de contenu, 20 nœuds décoratifs, 21 arcs principaux,
   12 498 points de terre.
-- Contenu : les **25 fiches portent « Texte à compléter. »**. Aucune n'a de
-  lecture longue (`long`) pour l'instant, donc aucun bouton « Voir en détail »
-  n'apparaît — la modale et son piège à focus existent et fonctionnent, elles
-  n'ont simplement rien à afficher tant qu'aucune fiche n'a de `long`.
+- Contenu : **24 des 25 fiches portent « Texte à compléter. »**. La
+  vingt-cinquième est la carte **Root-Me** de Certifications, seule fiche
+  réellement écrite : elle affiche les statistiques relevées du profil public
+  (voir la passe « carte Root-Me » ci-dessus, et l'objet `ROOTME` en tête de
+  `js/data.js` pour les mettre à jour). Aucune fiche n'a de lecture longue
+  (`long`) pour l'instant, donc aucun bouton « Voir en détail » n'apparaît — la
+  modale et son piège à focus existent et fonctionnent, elles n'ont simplement
+  rien à afficher tant qu'aucune fiche n'a de `long`.
 
 ### Plan de la feuille de style
 
 `css/style.css`, dans l'ordre : `PALETTE + BASES` · `ÉCRAN D'ACCUEIL` ·
 `INDICATEURS EN MODE GLOBE` · `BARRE DE NŒUDS` · `CONTENU EN ORBITE` ·
-`SATELLITES DE LIENS` · `MODALE DE LECTURE LONGUE` · `FEUILLE MOBILE` ·
-`ERREUR / DIVERS`, puis la requête `max-width:820px` (portrait) et la requête
-`prefers-reduced-motion`. Ces deux dernières sont en fin de feuille et doivent
+`SATELLITES DE LIENS` · `CARTE ROOT-ME` · `MODALE DE LECTURE LONGUE` ·
+`FEUILLE MOBILE` · `ERREUR / DIVERS`, puis la requête `max-width:820px`
+(portrait) et la requête `prefers-reduced-motion`. Ces deux dernières sont en fin de feuille et doivent
 le rester : plusieurs de leurs règles n'ont pas de `!important` et gagnent par
 l'ordre de cascade.
 
@@ -577,8 +718,11 @@ bloqués en `file://`, et la promesse « double-clic, aucun serveur » du README
 dépend. Ils partagent donc la portée globale, et l'ordre des balises est l'ordre
 des dépendances :
 
-1. **`js/data.js`** — `SOCIAUX` + `socialsHTML()`, `RUBRIQUES`, `SECONDAIRES`,
-   `fmtCoordsOf()`, `renderFallbackDoc()`, plus `REDUCED` et `isMobile()`.
+1. **`js/data.js`** — `SOCIAUX` + `socialsHTML()`, `ROOTME` + `rootmeHTML()`,
+   `RUBRIQUES`, `SECONDAIRES`, `fmtCoordsOf()`, `renderFallbackDoc()`, plus
+   `REDUCED` et `isMobile()`. `ROOTME` et `rootmeHTML()` doivent rester **avant**
+   `RUBRIQUES` : la carte est construite au chargement du fichier, dans le champ
+   `d` d'un bloc.
    Rien ici ne dépend de three.js : c'est **la** contrainte d'ordre, sans WebGL
    le contenu doit rester lisible.
 2. **`js/worldmap.js`** — `LAND`, `SEAS`, `buildWorldMap()`, `latLonToVec3()`,
@@ -624,8 +768,16 @@ SECONDAIRES = [ [nom, lat, lon], … ]   // nœuds décoratifs, sans contenu
   automatiquement (le décompte « 3 sur 7 » est calculé, jamais écrit), mais
   renommer un `id` ou déplacer une capitale demande de vérifier les pancartes
   voisines : deux capitales trop proches se chevauchent sur le globe.
-- `d` + `html:true` = contenu HTML injecté tel quel dans la fiche (un lien, par
-  exemple). Sans `html`, `d` est posé en texte.
+- `d` + `html:true` = contenu HTML injecté tel quel dans la fiche (un lien, une
+  carte entière comme celle de Root-Me). Sans `html`, `d` est posé en texte.
+  C'est **le** crochet pour ajouter un composant riche sans toucher à
+  `js/ui.js` : il traverse les trois rendus tout seul. Deux pièges, tous deux
+  payés une fois sur la carte Root-Me : le conteneur `.data` impose
+  `overflow-wrap:anywhere` et une taille de police monospace, et **les
+  sélecteurs des trois conteneurs l'emportent en spécificité** sur ceux du
+  composant (`.block p`, `.block a`, `#sheet .card p`, `#sheet a`,
+  `#fatal.doc p`, `#fatal.doc a`). Vérifier les styles calculés, pas seulement
+  le rendu à l'œil.
 - `long` = tableau de paragraphes ; sa seule présence fait apparaître le bouton
   « Voir en détail » et alimente la modale.
 - `sats:true` = la rubrique porte les trois liens en orbite. **Un seul drapeau à
@@ -663,7 +815,10 @@ deux autres sont ceux qu'on oublie.
   plus vite que l'interpolation lente et la transition n'arrive jamais.
 - **Aucune ressource externe hors CDN** : la carte du monde est générée sur un
   canvas, pas chargée — pas de `fetch`, pas d'image, donc pas de canvas *tainted*
-  en `file://`.
+  en `file://`. La carte Root-Me ne fait pas exception : son glyphe est un SVG
+  écrit sur place, et ses chiffres sont un relevé daté, **pas un appel réseau**
+  (voir la passe « carte Root-Me » : l'API exige une clé et n'envoie aucun
+  en-tête CORS, en `file://` comme en hébergement web).
 - **Le site s'ouvre en double-cliquant sur `index.html`.** Donc : **pas de module
   ES, pas de `fetch()`/XHR vers un fichier du dépôt**, jamais — les deux sont
   bloqués en `file://`. Les fichiers de `css/` et `js/` sont chargés par
@@ -728,10 +883,18 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
 
 ### Ce qui reste à faire
 
-- **Écrire le contenu** : les 25 fiches sont à remplir, et les lectures longues
-  (`long`) sont à ajouter là où elles ont un sens — c'est ce qui réveillera le
-  bouton « Voir en détail » et la modale.
-- **Pages GitHub** : la mise en ligne n'est pas encore configurée.
+- **Écrire le contenu** : les 24 fiches restantes sont à remplir (la carte
+  Root-Me, elle, est écrite), et les lectures longues (`long`) sont à ajouter là
+  où elles ont un sens — c'est ce qui réveillera le bouton « Voir en détail » et
+  la modale.
+- **Pages GitHub** : la mise en ligne n'est pas encore configurée. À noter : ce
+  n'est **pas** ce qui débloquerait un direct Root-Me — l'API n'envoie aucun
+  en-tête CORS, l'origine `https://nomalovv.github.io` est refusée exactement
+  comme `file://`.
+- **Rafraîchir les chiffres Root-Me** : corriger l'objet `ROOTME` en tête de
+  `js/data.js`, date `maj` comprise. Un direct demanderait un relais côté
+  serveur qui garde la clé et ajoute les en-têtes CORS — incompatible avec la
+  promesse « double-clic, aucun serveur ».
 
 ## Limites connues / à savoir
 
@@ -740,4 +903,5 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
 - Le CDN Three.js et Google Fonts nécessitent une connexion réseau au premier chargement (la carte du monde, elle, est entièrement inline). Un message s'affiche si le réseau est indisponible.
 - Les tracés côtiers sont volontairement simplifiés (~40 à 70 sommets par continent) : lisibles à l'échelle du globe, approximatifs si on zoomait fortement.
 - Les trois destinations de `SOCIAUX` sont réelles : adresse courriel de l'utilisateur (gardée volontairement, décision explicite), profil LinkedIn et compte GitHub `Nomalovv`. Elles flottent autour de la rubrique **Contact**, hors de toute carte.
-- Les 25 fiches de contenu portent toutes « Texte à compléter. » : le contenu réel reste à écrire (voir « Ce qui reste à faire » ci-dessus).
+- 24 des 25 fiches de contenu portent « Texte à compléter. » : le contenu réel reste à écrire (voir « Ce qui reste à faire » ci-dessus). La vingt-cinquième est la carte Root-Me.
+- **Les statistiques Root-Me ne sont pas en direct**, et la carte le dit (« Relevé manuel du … »). L'API Root-Me exige une clé transmise dans un en-tête `Cookie` — que `fetch()` n'a pas le droit de poser — et n'envoie aucun en-tête CORS ; la page publique est derrière un rempart anti-robot à preuve de travail. Aucun de ces obstacles ne tombe en passant sur GitHub Pages. Détail complet dans la passe « carte Root-Me ».
