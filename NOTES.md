@@ -16,6 +16,9 @@ même temps que le code.
 - `js/data.js`, `js/worldmap.js`, `js/globe.js`, `js/ui.js`, `js/main.js` — le
   script, découpé (voir « Où en est le projet » plus bas).
 - `README.md` — instructions d'ouverture et points de personnalisation rapides.
+- `scripts/update-rootme.mjs` + `.github/workflows/update-rootme.yml` — **hors
+  site** : la synchronisation quotidienne des chiffres Root-Me, qui tourne sur
+  GitHub Actions et réécrit un bloc de `js/data.js`. La page ne les charge pas.
 
 Three.js r128 est chargé en script classique depuis cdnjs, et les fichiers du
 dépôt le sont en chemins relatifs : **pas de module ES, pas de `fetch()`**, pour
@@ -668,6 +671,153 @@ mobile, l'inverse : elle n'est bâtie qu'à l'**ouverture**, donc il faut
 `closeRubrique()` d'abord si la rubrique était restée ouverte du parcours
 desktop, sinon rien n'est reconstruit.
 
+## Passe « synchronisation Root-Me » — le direct était impossible *dans le navigateur*
+
+La passe précédente avait conclu qu'un `fetch()` vers l'API Root-Me était
+impossible et s'était rabattue sur un relevé daté à la main. La conclusion était
+juste, mais elle portait plus loin qu'il ne fallait : **les deux verrous
+constatés sont des règles du navigateur, pas de l'API.**
+
+- l'en-tête `Cookie` est un *forbidden header name* : c'est la spécification
+  Fetch, côté client, qui l'interdit. `undici` (le `fetch` de Node) ne connaît
+  pas cette liste ;
+- CORS est un contrôle que le **navigateur** applique aux réponses avant de les
+  rendre au script. Une requête serveur-à-serveur n'a pas d'origine à vérifier :
+  l'absence d'`Access-Control-Allow-Origin` n'a alors aucun effet.
+
+Restait le troisième argument, qui lui ne tombe pas : une clé personnelle dans
+un dépôt public est lisible par tout le monde. Un secret GitHub Actions y répond
+exactement — la clé vit chez GitHub, elle est injectée en variable
+d'environnement le temps d'une exécution, et n'apparaît jamais dans un fichier.
+
+D'où la solution retenue, qui **ne change rien au site** : le rafraîchissement
+est un travail *hors ligne*. Le script écrit du JavaScript statique dans
+`js/data.js`, la page continue de ne lire qu'un fichier. Aucun `fetch()`, aucune
+clé, aucune dépendance de plus, et l'ouverture par double-clic reste vraie.
+
+### Les deux pièces
+
+```
+scripts/update-rootme.mjs             ESM, Node 18+, zéro dépendance
+.github/workflows/update-rootme.yml   cron quotidien + workflow_dispatch
+```
+
+Le workflow : `checkout` (historique complet, le `pull --rebase` final en a
+besoin) → `setup-node` → script → `node --check js/data.js` → commit et `push`
+direct sur `main` **seulement si `git diff` n'est pas vide**. `permissions:
+contents: write` et le `GITHUB_TOKEN` intégré suffisent ; pas de branche, pas de
+PR, conformément au reste du dépôt. Un verrou `concurrency` évite que
+l'exécution planifiée et un déclenchement manuel poussent en même temps.
+
+### Ce qui a demandé de la prudence, et pourquoi
+
+**1. Ne jamais écrire à moitié.** C'est la contrainte qui a structuré le script.
+Un profil qui reviendrait vide, une clé expirée, une réponse de forme
+inattendue : dans tous ces cas le comportement le plus dangereux serait d'écrire
+des zéros par-dessus de vraies statistiques. Le fichier n'est donc ouvert en
+écriture **qu'à la toute fin**, une fois `score`, `position` et les validations
+obtenus et validés ; tout le reste sort en `process.exit(1)` sans toucher au
+disque. Le contenu produit est en outre analysé (`new Function`, qui *parse*
+sans exécuter) avant d'être écrit, et le workflow le revérifie par
+`node --check` : un `js/data.js` cassé casserait le site entier.
+
+**2. Ne pas commiter pour rien.** Si la date de synchronisation était réécrite à
+chaque exécution réussie, le dépôt récolterait **un commit par jour** pour un
+changement d'un mot. Le script compare donc une *empreinte* des seules valeurs
+de fond (chiffres, rang, catégories) et ne réécrit rien si elle est identique.
+`maj` est par conséquent la date de la dernière **évolution constatée**, pas
+celle du dernier appel — et le libellé de la carte a été choisi en conséquence.
+
+**3. L'API n'a pas de contrat stable.** Elle est peu documentée et renvoie ses
+listes sous trois formes selon le point d'entrée (tableau, objet indexé par des
+clés numériques `{"0":{…},"1":{…}}`, ou tableau contenant un tel objet). Tout
+passe donc par un `enTableau()` qui aplatit les trois, et par un `champ()` qui
+accepte plusieurs noms possibles pour la même donnée. La catégorie d'une
+validation est prise sur la validation si elle s'y trouve, sinon cherchée sur
+`/challenges/{id}` (par lots de 4). Les validations sont paginées tant que
+l'appel rapporte des identifiants nouveaux : sans cela, un profil dépassant une
+page serait tronqué **en silence**, ce qui est pire qu'une erreur.
+
+**4. Le nombre de catégories est plafonné (`MAX_CATS`, 6).** La carte Root-Me
+est déjà la plus haute fiche du site (~352 px contre ~120) et chaque catégorie
+lui ajoute une ligne. L'invariant « aucune carte n'en chevauche une autre » se
+joue à quelques dizaines de pixels sur les écrans bas (voir la passe « sept
+rubriques ») : laisser une machine faire grandir cette carte sans limite serait
+lui confier une décision de mise en page. Relever `MAX_CATS` = rejouer le
+contrôle de chevauchement.
+
+**5. Le libellé tient sur une ligne — et c'est mesuré, pas espéré.** `.rm-sync`
+est du monospace 9,5 px dans une carte de 252 px de contenu, dont 13 px pris par
+la pastille et son écart : environ **41 signes**. « Synchronisé automatiquement
+le 2 septembre 2026 » en fait 46 — il serait passé sur deux lignes et aurait
+fait grandir la plus haute carte du site, exactement le défaut n° 2 de la passe
+précédente. Le libellé retenu est « **Synchro. auto. du 2 septembre 2026** »
+(34 signes, un de plus que l'ancien « Relevé manuel du … »), la phrase entière
+partant dans l'attribut `title`. Le mot est choisi par le champ `sync` de
+`ROOTME` : il reste à `'manuel'` tant que le script n'a pas réellement écrit —
+la carte n'annonce jamais une synchronisation qui n'a pas eu lieu.
+
+**6. `pct` disparaît de la synchronisation.** Le pourcentage de complétion par
+catégorie n'est pas exposé par l'API : il faudrait parcourir les 608 challenges
+un par un pour connaître le total de chaque rubrique. Le champ est donc devenu
+**facultatif** — `rootmeHTML()` rend l'infobulle sans lui — plutôt que de
+recopier une valeur figée qui se serait démodée en silence.
+
+**7. Fins de ligne et échappement.** `js/data.js` est en CRLF ; un bloc réinjecté
+en LF aurait produit un fichier mélangé et un diff qui déborde du bloc. Le script
+reprend la fin de ligne du fichier lu. Et comme les valeurs viennent désormais
+d'un tiers, elles passent par un `esc()` avant d'entrer dans du HTML — un nom de
+rubrique n'a aucune raison de contenir un guillemet, mais ce n'est plus nous qui
+l'écrivons.
+
+### Comment le bloc est réécrit
+
+Deux marqueurs encadrent l'objet dans `js/data.js` :
+
+```js
+/* @rootme:début */
+var ROOTME = { … };
+/* @rootme:fin */
+```
+
+Le script remplace **tout** ce qui se trouve entre les deux, et refuse de
+travailler si les marqueurs manquent plutôt que de deviner où écrire. Corollaire
+à retenir : ne rien ajouter entre eux qui doive survivre. Une retouche à la main
+des chiffres reste possible à tout moment — la prochaine synchronisation réussie
+reprend la main.
+
+### Vérifications de cette passe
+
+Le script a été rejoué contre un **bouchon de `fetch`** (installé par
+`node --import`, aucune requête réelle, aucune clé), sur huit scénarios :
+
+- **quatre échecs** — clé absente, clé refusée (401), API en panne (500), profil
+  sans validations : les quatre sortent en **code 1** avec un message explicite,
+  et `js/data.js` est **binairement identique** avant/après dans les quatre cas ;
+- **trois formes de réponse** — rubrique portée par la validation, rubrique
+  absente (28 appels `/challenges/{id}` déclenchés), liste au format objet
+  indexé : les trois produisent le même bloc, `node --check` passe, et le
+  fichier ne contient **aucune ligne en LF seul** (CRLF préservé) ;
+- **relance immédiate** : « Chiffres inchangés » et fichier intact — pas de
+  commit vide.
+
+La carte a par ailleurs été rendue hors navigateur (`rootmeHTML()` évalué sur le
+fichier réel) dans les deux états : `sync:'manuel'` avec `pct` → « Relevé manuel
+du 2 septembre 2026 » et infobulle « Réseau : 15 challenges validés, 42 % de la
+catégorie » ; `sync:'auto'` sans `pct` → « Synchro. auto. du 2 septembre 2026 »
+(34 signes) et infobulle « Réseau : 15 challenges validés ». Quatre lignes de
+catégories dans les deux cas.
+
+Ce qui n'a **pas** pu être vérifié, et qu'il faut savoir : le script n'a jamais
+été confronté à la vraie API — la clé appartient au propriétaire et n'a pas à
+transiter par ici. Les noms de champs (`score`, `position`, `rang`,
+`validations`, `rubrique`) viennent du relevé de la passe précédente ; le nom du
+paramètre de pagination (`debut_validations`) et la table de traduction des
+rangs sont, eux, des hypothèses. Les deux dégradent proprement : une pagination
+qui ne répond pas laisse la première page, un rang inconnu est **recopié tel
+quel** plutôt que traduit à tort. Le premier `Run workflow` manuel est donc le
+vrai test — et il ne peut pas abîmer le fichier, par construction.
+
 ## Où en est le projet — repères avant une grosse modification
 
 Section tenue à jour volontairement : elle décrit l'**état courant**, pas
@@ -676,17 +826,26 @@ avant de toucher quoi que ce soit, et à corriger en même temps que le code.
 
 ### Chiffres
 
-- 7 fichiers, ~138 Ko au total, three.js r128 chargé depuis cdnjs en script
+- 7 fichiers de site, ~140 Ko au total, three.js r128 chargé depuis cdnjs en script
   classique :
 
   ```
   index.html         75 lignes    squelette + appels des feuilles et scripts
   css/style.css     969 lignes    toute la mise en forme
-  js/data.js        331 lignes    RUBRIQUES, SOCIAUX, ROOTME, SECONDAIRES, repli
+  js/data.js        365 lignes    RUBRIQUES, SOCIAUX, ROOTME, SECONDAIRES, repli
   js/worldmap.js    220 lignes    contours, carte procédurale, textures
   js/globe.js       561 lignes    scène three.js, nœuds, arcs, état, vitesses
   js/ui.js          507 lignes    barre, cartes, satellites, modale, mobile
   js/main.js        481 lignes    amorçage, entrées, boucle de rendu
+  ```
+
+- Deux fichiers **hors site**, jamais chargés par la page, jamais copiés avec
+  elle : ils tournent sur GitHub Actions et se contentent de réécrire un bloc de
+  `js/data.js` (voir la passe « synchronisation Root-Me »).
+
+  ```
+  scripts/update-rootme.mjs             ESM, Node 18+, aucune dépendance
+  .github/workflows/update-rootme.yml   cron quotidien + déclenchement manuel
   ```
 
 - 7 rubriques, 25 fiches de contenu, 20 nœuds décoratifs, 21 arcs principaux,
@@ -722,7 +881,9 @@ des dépendances :
    `RUBRIQUES`, `SECONDAIRES`, `fmtCoordsOf()`, `renderFallbackDoc()`, plus
    `REDUCED` et `isMobile()`. `ROOTME` et `rootmeHTML()` doivent rester **avant**
    `RUBRIQUES` : la carte est construite au chargement du fichier, dans le champ
-   `d` d'un bloc.
+   `d` d'un bloc. `ROOTME` est encadré par les marqueurs `/* @rootme:début */`
+   et `/* @rootme:fin */` : `scripts/update-rootme.mjs` remplace **tout** ce qui
+   se trouve entre les deux — ne rien y mettre qui doive survivre.
    Rien ici ne dépend de three.js : c'est **la** contrainte d'ordre, sans WebGL
    le contenu doit rester lisible.
 2. **`js/worldmap.js`** — `LAND`, `SEAS`, `buildWorldMap()`, `latLonToVec3()`,
@@ -816,9 +977,13 @@ deux autres sont ceux qu'on oublie.
 - **Aucune ressource externe hors CDN** : la carte du monde est générée sur un
   canvas, pas chargée — pas de `fetch`, pas d'image, donc pas de canvas *tainted*
   en `file://`. La carte Root-Me ne fait pas exception : son glyphe est un SVG
-  écrit sur place, et ses chiffres sont un relevé daté, **pas un appel réseau**
-  (voir la passe « carte Root-Me » : l'API exige une clé et n'envoie aucun
-  en-tête CORS, en `file://` comme en hébergement web).
+  écrit sur place, et ses chiffres sont des **valeurs statiques** de `js/data.js`,
+  **pas un appel réseau** (l'API exige une clé dans un en-tête que `fetch()` ne
+  peut pas poser et n'envoie aucun en-tête CORS, en `file://` comme en
+  hébergement web). Qu'un script les rafraîchisse hors ligne n'y change rien :
+  ce script tourne sur un runner GitHub Actions, **jamais dans le navigateur**.
+  Ne pas « moderniser » cela en appelant l'API depuis la page — ça ne peut pas
+  marcher, et ça exposerait la clé.
 - **Le site s'ouvre en double-cliquant sur `index.html`.** Donc : **pas de module
   ES, pas de `fetch()`/XHR vers un fichier du dépôt**, jamais — les deux sont
   bloqués en `file://`. Les fichiers de `css/` et `js/` sont chargés par
@@ -891,10 +1056,14 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
   n'est **pas** ce qui débloquerait un direct Root-Me — l'API n'envoie aucun
   en-tête CORS, l'origine `https://nomalovv.github.io` est refusée exactement
   comme `file://`.
-- **Rafraîchir les chiffres Root-Me** : corriger l'objet `ROOTME` en tête de
-  `js/data.js`, date `maj` comprise. Un direct demanderait un relais côté
-  serveur qui garde la clé et ajoute les en-têtes CORS — incompatible avec la
-  promesse « double-clic, aucun serveur ».
+- **Ajouter le secret `ROOTME_API_KEY`** (à faire par le propriétaire, une
+  seule fois) : `Settings` → `Secrets and variables` → `Actions` →
+  `New repository secret`, nom exact `ROOTME_API_KEY`, valeur = la clé d'API du
+  compte Root-Me. Tant qu'il manque, la tâche planifiée échoue **proprement** à
+  chaque exécution : aucun commit, `js/data.js` intact, site inchangé. Une fois
+  le secret posé, `Actions` → `Stats Root-Me` → `Run workflow` fait le premier
+  essai. Un rafraîchissement à la main de l'objet `ROOTME` reste possible en
+  attendant, et à tout moment ensuite.
 
 ## Limites connues / à savoir
 
@@ -904,4 +1073,6 @@ Ce qui compte dans le harnais, et qui a été appris à la dure :
 - Les tracés côtiers sont volontairement simplifiés (~40 à 70 sommets par continent) : lisibles à l'échelle du globe, approximatifs si on zoomait fortement.
 - Les trois destinations de `SOCIAUX` sont réelles : adresse courriel de l'utilisateur (gardée volontairement, décision explicite), profil LinkedIn et compte GitHub `Nomalovv`. Elles flottent autour de la rubrique **Contact**, hors de toute carte.
 - 24 des 25 fiches de contenu portent « Texte à compléter. » : le contenu réel reste à écrire (voir « Ce qui reste à faire » ci-dessus). La vingt-cinquième est la carte Root-Me.
-- **Les statistiques Root-Me ne sont pas en direct**, et la carte le dit (« Relevé manuel du … »). L'API Root-Me exige une clé transmise dans un en-tête `Cookie` — que `fetch()` n'a pas le droit de poser — et n'envoie aucun en-tête CORS ; la page publique est derrière un rempart anti-robot à preuve de travail. Aucun de ces obstacles ne tombe en passant sur GitHub Pages. Détail complet dans la passe « carte Root-Me ».
+- **Les statistiques Root-Me ne sont pas lues par la page**, et la carte le dit (« Relevé manuel du … », ou « Synchro. auto. du … » une fois la tâche en service). L'API Root-Me exige une clé transmise dans un en-tête `Cookie` — que `fetch()` n'a pas le droit de poser — et n'envoie aucun en-tête CORS ; la page publique est derrière un rempart anti-robot à preuve de travail. Aucun de ces obstacles ne tombe en passant sur GitHub Pages. Elles sont donc rafraîchies **hors ligne**, par `scripts/update-rootme.mjs` lancé une fois par jour par GitHub Actions, qui réécrit et commite le bloc `ROOTME` de `js/data.js`. Détail complet dans les passes « carte Root-Me » et « synchronisation Root-Me ».
+- La tâche planifiée **ne tourne pas tant que le secret `ROOTME_API_KEY` n'est pas ajouté** au dépôt : chaque exécution échoue proprement (rouge dans l'onglet Actions) sans rien commiter ni casser. Le site continue d'afficher les derniers chiffres commités.
+- Le champ `pct` de `ROOTME.categories` (pourcentage de la catégorie complétée, visible en infobulle) est **facultatif** et n'est pas récupéré par la synchronisation : l'API ne le donne pas sans parcourir les 608 challenges un à un. Il disparaîtra donc de l'infobulle à la première synchronisation réussie.
