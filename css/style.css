@@ -20,6 +20,12 @@
   --rm-soft:#ff9a9d;
   --rm-brd:rgba(224,53,58,.22);
 
+  /* Pastille de statut « indisponible » (bloc Disponibilité, rubrique Contact).
+     Volontairement distincte du rouge Root-Me ci-dessus, qui est une couleur de
+     marque : les deux se ressemblent à l'œil, ils ne doivent pas se confondre
+     dans le code — changer l'un ne doit jamais bouger l'autre. */
+  --busy:#ef4b52;
+
   /* Textes : trois niveaux seulement, tous vérifiés >= 4.5:1 sur les fonds
      sombres utilisés (fond profond ET surface vitrée par-dessus le globe). */
   --text:#e4f0f9;        /* 15,9:1 sur --bg-deep */
@@ -715,6 +721,37 @@ body.open #close{
   .rm-stats b{font-size:17px}
   .rm-cats{margin-top:10px; gap:5px}
   .rm-sync{margin-top:10px}
+}
+
+/* ============================================================
+   BLOC DISPONIBILITÉ — rubrique Contact
+   Comme la carte Root-Me, ce bloc est posé dans le champ « data » d'une fiche
+   ordinaire (« html:true ») : il traverse donc les TROIS rendus du site sans
+   code en double, et ses sélecteurs ne s'accrochent à aucun des trois
+   conteneurs. Le champ « p » ne pouvait pas convenir : il est posé en texte
+   brut (textContent) dans les trois rendus, il ne peut porter aucune pastille.
+   Rien de spectaculaire ici : la structure et la typographie sont celles des
+   autres fiches. Le seul élément distinctif est la pastille rouge, reprise
+   telle quelle du vocabulaire de statut déjà en place (#brand .pip, .rm-dot :
+   disque plein + halo). Elle est décorative — c'est le texte qui porte
+   l'information, la pastille est en « aria-hidden ».
+   ============================================================ */
+.dispo{
+  display:flex; align-items:center; gap:9px;
+  font-family:var(--font-sans); font-size:13px; line-height:1.4;
+  letter-spacing:0; color:var(--text);
+  /* Les conteneurs « .data » posent « overflow-wrap:anywhere » pour les lignes
+     de données monospace : ici il couperait « 2027 » en fin de ligne. */
+  overflow-wrap:normal; word-break:normal;
+}
+.dispo-dot{
+  flex:none; width:8px; height:8px; border-radius:50%;
+  background:var(--busy); box-shadow:0 0 8px rgba(239,75,82,.8);
+}
+.dispo-note{
+  margin-top:7px; font-family:var(--font-mono); font-size:10.5px;
+  line-height:1.5; letter-spacing:.01em; color:var(--text-mono);
+  overflow-wrap:normal;
 }
 
 /* ============================================================

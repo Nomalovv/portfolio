@@ -393,7 +393,9 @@ function openRubrique(idx) {
     var el = document.createElement('article');
     el.className = 'block';
     var h = document.createElement('h3'); h.textContent = bl.t; el.appendChild(h);
-    var p = document.createElement('p'); p.textContent = bl.p; el.appendChild(p);
+    // « p » est facultatif : une fiche peut n'être qu'un composant posé en « d »
+    // (bloc Disponibilité). Sans ce garde, elle afficherait « undefined ».
+    if (bl.p) { var p = document.createElement('p'); p.textContent = bl.p; el.appendChild(p); }
     if (bl.d) {
       var d = document.createElement('div'); d.className = 'data';
       if (bl.html) d.innerHTML = bl.d; else d.textContent = bl.d;
@@ -473,7 +475,8 @@ function buildSheet(r) {
   r.blocs.forEach(function (bl) {
     var c = document.createElement('div'); c.className = 'card';
     var h3 = document.createElement('h3'); h3.textContent = bl.t; c.appendChild(h3);
-    var p = document.createElement('p'); p.textContent = bl.p; c.appendChild(p);
+    // Idem feuille mobile : « p » facultatif (voir openRubrique).
+    if (bl.p) { var p = document.createElement('p'); p.textContent = bl.p; c.appendChild(p); }
     if (bl.d) {
       var d = document.createElement('div'); d.className = 'data';
       if (bl.html) d.innerHTML = bl.d; else d.textContent = bl.d;

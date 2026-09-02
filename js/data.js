@@ -270,13 +270,21 @@ var RUBRIQUES = [
     sats: true,
     blocs: [
       { t:'Courriel',
-        p:"Texte à compléter.",
+        p:"Vous pouvez me joindre par courriel à l’adresse ci-dessous.",
         d:'<a href="mailto:arthur.formentin@sts-sio-caen.info">arthur.formentin@sts-sio-caen.info</a>',
         html:true },
       // Les liens ne sont plus dans une carte : ils flottent autour de la
-      // rubrique (voir « sats » ci-dessus). Les deux cartes restent du texte.
+      // rubrique (voir « sats » ci-dessus).
+      // Disponibilité : la pastille rouge est portée par « d » + « html:true »,
+      // pas par « p » — ce dernier est posé en texte brut (textContent) dans les
+      // trois rendus et ne peut contenir aucun balisage. Le bloc se passe donc
+      // de « p » (facultatif, voir les trois rendus). La pastille est décorative
+      // (« aria-hidden ») : c'est le texte qui porte l'information.
       { t:'Disponibilité',
-        p:"Texte à compléter." }
+        d:'<div class="dispo"><span class="dispo-dot" aria-hidden="true"></span>' +
+          'Indisponible jusqu’en juillet 2027</div>' +
+          '<div class="dispo-note">Actuellement en alternance à la DGFIP, en licence STS.</div>',
+        html:true }
     ]
   }
 ];
@@ -331,7 +339,9 @@ function renderFallbackDoc(raison) {
     r.blocs.forEach(function (bl) {
       var art = document.createElement('article');
       var h3 = document.createElement('h3'); h3.textContent = bl.t; art.appendChild(h3);
-      var p = document.createElement('p'); p.textContent = bl.p; art.appendChild(p);
+      // « p » est facultatif (un bloc peut n'être qu'un composant en « d ») :
+      // sans ce garde, un bloc sans « p » rendait le mot « undefined ».
+      if (bl.p) { var p = document.createElement('p'); p.textContent = bl.p; art.appendChild(p); }
       if (bl.long) {
         bl.long.forEach(function (par) {
           var lp = document.createElement('p'); lp.textContent = par; art.appendChild(lp);
