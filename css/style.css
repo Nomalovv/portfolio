@@ -12,6 +12,14 @@
   --warm:#ff9d4d;
   --warm-soft:#ffc79a;
 
+  /* Rouge Root-Me — exception de marque, assumée et limitée à la seule carte
+     Root-Me de la rubrique Certifications. Partout ailleurs l'accent du site
+     reste --accent. « rm-soft » est la seule des trois à porter du texte :
+     8,9:1 sur la vitre des cartes, largement au-dessus de 4,5:1. */
+  --rm:#e0353a;
+  --rm-soft:#ff9a9d;
+  --rm-brd:rgba(224,53,58,.22);
+
   /* Textes : trois niveaux seulement, tous vérifiés >= 4.5:1 sur les fonds
      sombres utilisés (fond profond ET surface vitrée par-dessus le globe). */
   --text:#e4f0f9;        /* 15,9:1 sur --bg-deep */
@@ -586,6 +594,130 @@ body.open #close{
 }
 
 /* ============================================================
+   CARTE ROOT-ME
+   Posée dans le champ « data » d'un bloc ordinaire, donc rendue par les TROIS
+   chemins du site : cartes en orbite, feuille mobile et repli texte. Les
+   sélecteurs ne sont donc accrochés à aucun de ces trois conteneurs — ils
+   partent tous de « .rm ». Le parent « .data » impose du monospace 11 px : la
+   carte remet sa propre typographie.
+   Seule zone du site en rouge : c'est la couleur de marque de Root-Me, et la
+   rupture avec l'accent cyan est voulue — cette carte parle d'un service tiers.
+   ============================================================ */
+.rm{
+  font-family:var(--font-sans); font-size:13px; line-height:1.45;
+  letter-spacing:0; color:var(--text);
+  /* Les trois conteneurs « .data » posent « overflow-wrap:anywhere » pour les
+     longues lignes de données monospace. Hérité ici, il coupait « #51 444 » en
+     plein milieu d'un nombre : la carte reprend la césure normale. */
+  overflow-wrap:normal; word-break:normal;
+}
+
+/* -- En-tête : glyphe, identité, lien sortant -- */
+.rm-head{
+  display:flex; align-items:center; gap:9px;
+  padding-bottom:10px; border-bottom:1px solid var(--rm-brd);
+}
+.rm-logo{flex:none; width:26px; height:26px; display:block}
+.rm-logo svg{
+  display:block; width:100%; height:100%;
+  fill:none; stroke:var(--rm-soft); stroke-width:1.6;
+  stroke-linecap:round; stroke-linejoin:round;
+  filter:drop-shadow(0 0 6px rgba(224,53,58,.45));
+}
+.rm-logo svg .g{stroke-width:1.9}
+.rm-id{
+  flex:1 1 auto; min-width:0;
+  font-family:var(--font-mono); font-size:10px; line-height:1.4;
+  color:var(--text-dim); overflow-wrap:anywhere;
+}
+.rm-link{
+  flex:none; display:inline-flex; align-items:center;
+  min-height:32px; padding:6px 10px;
+  font-family:inherit; font-size:11px; font-weight:500; white-space:nowrap;
+  color:var(--rm-soft); text-decoration:none;
+  background:rgba(224,53,58,.09);
+  border:1px solid rgba(224,53,58,.34); border-radius:8px;
+  transition:border-color .25s var(--ease), background-color .25s var(--ease);
+}
+.rm-link:hover{border-color:rgba(224,53,58,.7); background:rgba(224,53,58,.16)}
+
+/* -- Trois tuiles de chiffres -- */
+.rm-stats{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:6px;
+  margin:11px 0 0; padding:0; list-style:none;
+}
+.rm-stats li{
+  padding:8px 4px 7px; text-align:center;
+  background:rgba(224,53,58,.06);
+  border:1px solid rgba(224,53,58,.15); border-radius:8px;
+}
+.rm-stats b{
+  display:block; font-size:19px; font-weight:600; letter-spacing:-.025em;
+  line-height:1.05; color:var(--rm-soft); font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+/* Nombre long (le classement mondial) : un cran plus petit, pour tenir dans la
+   tuile sans déborder ni passer sur deux lignes. Posé par rootmeHTML(). */
+.rm-stats b.tight{font-size:15px; letter-spacing:-.035em}
+.rm-stats span{
+  display:block; margin-top:3px;
+  font-size:9px; line-height:1.25; color:var(--text-dim); letter-spacing:.005em;
+}
+
+/* -- Barres par catégorie -- */
+.rm-cats{display:grid; gap:6px; margin:12px 0 0; padding:0; list-style:none}
+.rm-cats li{
+  display:grid; grid-template-columns:minmax(0,74px) 1fr 20px;
+  align-items:center; gap:8px; font-size:11px;
+}
+.rm-cat{color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.rm-bar{height:6px; border-radius:3px; background:rgba(143,199,232,.12); overflow:hidden}
+.rm-bar i{
+  display:block; height:100%; border-radius:3px;
+  background:linear-gradient(90deg,rgba(224,53,58,.8),var(--rm-soft));
+}
+.rm-n{
+  font-family:var(--font-mono); font-size:11px; text-align:right;
+  color:var(--text); font-variant-numeric:tabular-nums;
+}
+
+/* -- Ligne de statut. Le libellé dit ce qui est vrai : ces chiffres sont un
+      relevé daté, pas un flux. Voir le commentaire de ROOTME dans data.js. -- */
+.rm-sync{
+  display:flex; align-items:center; gap:7px; margin:12px 0 0;
+  font-family:var(--font-mono); font-size:9.5px; line-height:1.4;
+  color:var(--text-mono);
+}
+.rm-dot{
+  flex:none; width:6px; height:6px; border-radius:50%;
+  background:var(--rm); box-shadow:0 0 7px rgba(224,53,58,.85);
+}
+
+/* Les TROIS conteneurs soulignent leurs liens en cyan et l'emportent en
+   spécificité sur « .rm-link » : « .block a » (0,1,1), « #sheet a » (1,0,1) et
+   « #fatal.doc a » (1,1,1). Le bouton du haut est donc repris ici une fois pour
+   les trois — sans cela il repassait à l'accent du site, ce qui annulait toute
+   l'exception de marque. */
+.block .rm-link, #sheet .rm-link, #fatal.doc .rm-link{
+  color:var(--rm-soft); border-bottom:0;
+}
+.block .rm-link:hover, #sheet .rm-link:hover, #fatal.doc .rm-link:hover{
+  color:#ffc6c8; border-bottom:0;
+}
+.rm-link span{margin-left:4px}
+
+/* Écran bas : mêmes réductions que les autres cartes (voir le palier compact
+   plus haut), pour que la pile reste dans le budget de hauteur. */
+@media (min-width:821px) and (max-height:780px){
+  .rm{font-size:12.5px}
+  .rm-stats{margin-top:9px; gap:5px}
+  .rm-stats li{padding:6px 3px 5px}
+  .rm-stats b{font-size:17px}
+  .rm-cats{margin-top:10px; gap:5px}
+  .rm-sync{margin-top:10px}
+}
+
+/* ============================================================
    MODALE DE LECTURE LONGUE
    ============================================================ */
 #modal{
@@ -799,6 +931,23 @@ body.open #close{
   .navnode .loc{display:none}
   /* La feuille de contenu recouvre la barre : on l'escamote pendant la lecture */
   body.open #dock{opacity:0; pointer-events:none}
+
+  /* Carte Root-Me : le lien sortant est ici une vraie cible tactile (44 px),
+     comme les boutons « Voir en détail » de la feuille. L'en-tête passe sur
+     deux rangées, faute de quoi le bouton écrase l'identité sur un écran
+     étroit ; le reste gagne quelques dixièmes de point. */
+  .rm{font-size:13.5px}
+  .rm-head{flex-wrap:wrap; row-gap:9px; padding-bottom:12px}
+  .rm-id{flex:1 1 120px; font-size:11px}
+  .rm-link{min-height:44px; padding:10px 14px; font-size:12.5px}
+  .rm-stats{gap:8px; margin-top:13px}
+  .rm-stats li{padding:10px 5px 9px}
+  .rm-stats b{font-size:21px}
+  .rm-stats span{font-size:10px}
+  .rm-cats{gap:8px; margin-top:14px}
+  .rm-cats li{grid-template-columns:minmax(0,92px) 1fr 24px; font-size:12px}
+  .rm-n{font-size:12px}
+  .rm-sync{font-size:10.5px; margin-top:14px}
 }
 
 @media (prefers-reduced-motion:reduce){

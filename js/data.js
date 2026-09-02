@@ -72,6 +72,103 @@ function socialsHTML(variante) {
   }).join('') + '</span>';
 }
 
+/* --- 1.b Carte Root-Me (rubrique Certifications) ----------------------------
+   Chiffres RÉELS du profil public https://www.root-me.org/Nomalow, relevés le
+   2 septembre 2026 via l'API officielle (auteurs/1006965) et recoupés sur la
+   page publique. Ils ne sont PAS inventés, et ils ne sont PAS synchronisés en
+   direct — voir NOTES.md, section « Carte Root-Me », pour le détail de
+   l'enquête. En résumé, trois obstacles rendent un fetch() navigateur
+   impossible, en file:// comme en hébergement web :
+
+     1. l'API exige une clé (401 sans elle sur tous les points d'entrée) ;
+     2. cette clé se transmet dans l'en-tête « Cookie », que fetch() n'a pas le
+        droit de poser (nom d'en-tête interdit) — ni en query, ni en en-tête
+        maison, tous deux refusés en 401 ;
+     3. aucune réponse ne porte « Access-Control-Allow-Origin », et le
+        préaffichage OPTIONS répond 404 : le navigateur bloque l'appel avant
+        même de regarder la clé.
+
+   Et à supposer que tout cela marche, une clé personnelle posée dans un dépôt
+   public serait de toute façon lisible par n'importe qui. D'où le libellé
+   honnête « Relevé manuel du … » en bas de la carte : on n'annonce pas un
+   direct qui n'existe pas. Mettre à jour = corriger les nombres ci-dessous et
+   la date « maj ». */
+var ROOTME = {
+  pseudo: 'Nomalow',
+  profil: 'https://www.root-me.org/Nomalow',
+  rang: 'Curieux',                 // champ « rang » de l'API : « curious »
+  challenges: 28,
+  challengesTotal: 608,
+  points: 335,
+  classement: 51444,
+  maj: '2 septembre 2026',
+  // n = challenges validés dans la catégorie ; pct = part de la catégorie
+  // complétée, telle que Root-Me l'affiche sur la page publique.
+  categories: [
+    { nom: 'Réseau',       n: 15, pct: 42 },
+    { nom: 'Web-Client',   n:  9, pct: 21 },
+    { nom: 'Web-Serveur',  n:  3, pct:  3 },
+    { nom: 'Cryptanalyse', n:  1, pct:  1 }
+  ]
+};
+
+/* Espace fine insécable dans les milliers : « 51 444 » ne doit jamais être
+   coupé en fin de ligne au milieu d'un nombre. */
+function fmtMilliers(n) {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+}
+
+/* Rend la carte Root-Me. Renvoie du HTML posé tel quel dans le champ « d »
+   d'un bloc (« html:true ») : il traverse donc les TROIS rendus du site
+   — cartes en orbite, feuille mobile et repli texte — sans code en double.
+   Le glyphe est un dessin maison (invite de terminal), pas le logo déposé de
+   Root-Me : aucune ressource externe n'est chargée, invariant du site. */
+function rootmeHTML() {
+  var max = ROOTME.categories.reduce(function (m, c) { return Math.max(m, c.n); }, 1);
+  var tuiles = [
+    { v: fmtMilliers(ROOTME.challenges), l: 'Challenges résolus' },
+    { v: fmtMilliers(ROOTME.points),     l: 'Points' },
+    { v: '#' + fmtMilliers(ROOTME.classement), l: 'Classement mondial' }
+  ];
+  return '<div class="rm">' +
+    '<div class="rm-head">' +
+      '<span class="rm-logo" aria-hidden="true">' +
+        '<svg viewBox="0 0 24 24" focusable="false">' +
+          '<rect x="1.6" y="3.4" width="20.8" height="17.2" rx="4.2"/>' +
+          '<path class="g" d="M7 9.2l3.1 2.8L7 14.8"/>' +
+          '<path class="g" d="M12.4 15.4h4.7"/>' +
+        '</svg>' +
+      '</span>' +
+      '<span class="rm-id">root-me.org<br>rang « ' + ROOTME.rang + ' »</span>' +
+      '<a class="rm-link" href="' + ROOTME.profil + '" target="_blank" rel="noopener noreferrer"' +
+        ' aria-label="Profil public Root-Me de ' + ROOTME.pseudo + ' (nouvel onglet)">' +
+        'Profil public<span aria-hidden="true"> ↗</span></a>' +
+    '</div>' +
+    '<ul class="rm-stats">' + tuiles.map(function (t) {
+      // Une tuile ne fait que 79 px : au-delà de cinq caractères le nombre est
+      // rendu d'un cran plus petit plutôt que coupé en deux lignes.
+      return '<li><b' + (t.v.length > 5 ? ' class="tight"' : '') + '>' + t.v +
+             '</b><span>' + t.l + '</span></li>';
+    }).join('') + '</ul>' +
+    '<ul class="rm-cats">' + ROOTME.categories.map(function (c) {
+      // Barre proportionnelle à la catégorie la mieux fournie, pas au total de
+      // Root-Me : c'est le nombre de validations qui est affiché à côté. Un
+      // plancher de 7 % garde la barre lisible quand la valeur vaut 1.
+      var w = Math.max(7, Math.round(c.n / max * 100));
+      var s = c.n > 1 ? 's' : '';
+      return '<li title="' + c.nom + ' : ' + c.n + ' challenge' + s + ' validé' + s + ', ' +
+             c.pct + ' % de la catégorie">' +
+             '<span class="rm-cat">' + c.nom + '</span>' +
+             '<span class="rm-bar" aria-hidden="true"><i style="width:' + w + '%"></i></span>' +
+             '<span class="rm-n">' + c.n + '</span></li>';
+    }).join('') + '</ul>' +
+    // « div » et non « p » : « .block p », « #sheet .card p » et « #fatal.doc p »
+    // fixent chacun une taille de texte, et l'emporteraient sur la nôtre.
+    '<div class="rm-sync"><span class="rm-dot" aria-hidden="true"></span>' +
+      'Relevé manuel du ' + ROOTME.maj + '</div>' +
+  '</div>';
+}
+
 var RUBRIQUES = [
   {
     id: 'apropos', nom: 'À propos', ville: 'Paris', lat: 48.85, lon: 2.35,
@@ -97,7 +194,13 @@ var RUBRIQUES = [
       { t:'Certification 1', p:"Texte à compléter." },
       { t:'Certification 2', p:"Texte à compléter." },
       { t:'Certification 3', p:"Texte à compléter." },
-      { t:'Pratique régulière', p:"Texte à compléter." }
+      // Pratique régulière : la carte Root-Me tient ce rôle. Elle reste un bloc
+      // ordinaire (« d » + « html:true »), donc elle est rendue à l'identique
+      // sur le globe, dans la feuille mobile et dans le repli texte.
+      { t:'Root-Me',
+        p:"Entraînement offensif continu — statistiques du profil public.",
+        d: rootmeHTML(),
+        html:true }
     ]
   },
   {
@@ -202,7 +305,10 @@ function renderFallbackDoc(raison) {
         });
       }
       if (bl.d) {
-        var d = document.createElement('p'); d.className = 'data';
+        // « div » et non « p » dès que le contenu est du HTML : un bloc (liste,
+        // barre de progression…) posé dans un <p> serait une imbrication
+        // invalide, que le navigateur défait en cours de route.
+        var d = document.createElement(bl.html ? 'div' : 'p'); d.className = 'data';
         if (bl.html) d.innerHTML = bl.d; else d.textContent = bl.d;
         art.appendChild(d);
       }
